@@ -19,25 +19,31 @@ package org.optaplanner.core.api.score.constraint;
 import java.io.Serializable;
 import java.util.List;
 
-import org.apache.commons.lang3.builder.CompareToBuilder;
+import org.optaplanner.core.api.score.Score;
 
 /**
  * Retrievable from {@link ConstraintMatchTotal#getConstraintMatchSet()}.
  */
-public abstract class ConstraintMatch implements Serializable, Comparable<ConstraintMatch> {
+public final class ConstraintMatch implements Serializable, Comparable<ConstraintMatch> {
 
-    protected final String constraintPackage;
-    protected final String constraintName;
-    protected final int scoreLevel;
+    private final String constraintPackage;
+    private final String constraintName;
 
-    protected final List<Object> justificationList;
+    private final List<Object> justificationList;
+    private final Score score;
 
-    protected ConstraintMatch(String constraintPackage, String constraintName, int scoreLevel,
-            List<Object> justificationList) {
+    /**
+     * @param constraintPackage never null
+     * @param constraintName never null
+     * @param justificationList never null, sometimes empty
+     * @param score never null
+     */
+    public ConstraintMatch(String constraintPackage, String constraintName,
+            List<Object> justificationList, Score score) {
         this.constraintPackage = constraintPackage;
         this.constraintName = constraintName;
-        this.scoreLevel = scoreLevel;
         this.justificationList = justificationList;
+        this.score = score;
     }
 
     public String getConstraintPackage() {
@@ -48,37 +54,72 @@ public abstract class ConstraintMatch implements Serializable, Comparable<Constr
         return constraintName;
     }
 
-    public int getScoreLevel() {
-        return scoreLevel;
-    }
-
     public List<Object> getJustificationList() {
         return justificationList;
     }
 
-    public abstract Number getWeightAsNumber();
+    public Score getScore() {
+        return score;
+    }
 
     // ************************************************************************
     // Worker methods
     // ************************************************************************
 
+    public String getConstraintId() {
+        return constraintPackage + "/" + constraintName;
+    }
+
     public String getIdentificationString() {
-        return constraintPackage + "/" + constraintName + "/level" + scoreLevel + "/" + justificationList;
+        return getConstraintId() + "/" + justificationList;
     }
 
     @Override
     public int compareTo(ConstraintMatch other) {
-        return new CompareToBuilder()
-                .append(getConstraintPackage(), other.getConstraintPackage())
-                .append(getConstraintName(), other.getConstraintName())
-                .append(getScoreLevel(), other.getScoreLevel())
-                .append(getJustificationList(), other.getJustificationList())
-                .append(getWeightAsNumber(), other.getWeightAsNumber())
-                .toComparison();
+        if (!constraintPackage.equals(other.constraintPackage)) {
+            return constraintPackage.compareTo(other.constraintPackage);
+        } else if (!constraintName.equals(other.constraintName)) {
+            return constraintName.compareTo(other.constraintName);
+        } else {
+            for (int i = 0; i < justificationList.size() && i < other.justificationList.size(); i++) {
+                int comparison = ((Comparable) justificationList.get(i)).compareTo(other.justificationList.get(i));
+                if (comparison != 0) {
+                    return comparison;
+                }
+            }
+            if (justificationList.size() != other.justificationList.size()) {
+                return justificationList.size() < other.justificationList.size() ? -1 : 1;
+            } else {
+                return 0;
+            }
+        }
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        } else if (o instanceof ConstraintMatch) {
+            ConstraintMatch other = (ConstraintMatch) o;
+            return constraintPackage.equals(other.constraintPackage)
+                    && constraintName.equals(other.constraintName)
+                    && justificationList.equals(other.justificationList);
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        return (((17 * 37)
+                + constraintPackage.hashCode()) * 37
+                + constraintName.hashCode()) * 37
+                + justificationList.hashCode();
+    }
+
+    @Override
     public String toString() {
-        return getIdentificationString()  + "=" + getWeightAsNumber();
+        return getIdentificationString() + "=" + getScore();
     }
 
 }

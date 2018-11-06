@@ -18,24 +18,23 @@ package org.optaplanner.examples.nurserostering.persistence;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.jdom.DataConversionException;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.optaplanner.examples.common.persistence.AbstractXmlSolutionImporter;
-import org.optaplanner.examples.nurserostering.domain.DayOfWeek;
+import org.optaplanner.examples.common.persistence.SolutionConverter;
+import org.optaplanner.examples.nurserostering.app.NurseRosteringApp;
 import org.optaplanner.examples.nurserostering.domain.Employee;
 import org.optaplanner.examples.nurserostering.domain.NurseRoster;
 import org.optaplanner.examples.nurserostering.domain.NurseRosterParametrization;
@@ -63,14 +62,14 @@ import org.optaplanner.examples.nurserostering.domain.request.DayOnRequest;
 import org.optaplanner.examples.nurserostering.domain.request.ShiftOffRequest;
 import org.optaplanner.examples.nurserostering.domain.request.ShiftOnRequest;
 
+import static java.time.temporal.ChronoUnit.*;
+
 public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRoster> {
 
     public static void main(String[] args) {
-        new NurseRosteringImporter().convertAll();
-    }
-
-    public NurseRosteringImporter() {
-        super(new NurseRosteringDao());
+        SolutionConverter<NurseRoster> converter = SolutionConverter.createImportConverter(
+                NurseRosteringApp.DATA_DIR_NAME, new NurseRosteringImporter(), NurseRoster.class);
+        converter.convertAll();
     }
 
     @Override
@@ -80,11 +79,11 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
 
     public static class NurseRosteringInputBuilder extends XmlInputBuilder<NurseRoster> {
 
-        protected Map<String, ShiftDate> shiftDateMap;
+        protected Map<LocalDate, ShiftDate> shiftDateMap;
         protected Map<String, Skill> skillMap;
         protected Map<String, ShiftType> shiftTypeMap;
-        protected Map<List<String>, Shift> dateAndShiftTypeToShiftMap;
-        protected Map<List<Object>, List<Shift>> dayOfWeekAndShiftTypeToShiftListMap;
+        protected Map<Pair<LocalDate, String>, Shift> dateAndShiftTypeToShiftMap;
+        protected Map<Pair<DayOfWeek, ShiftType>, List<Shift>> dayOfWeekAndShiftTypeToShiftListMap;
         protected Map<String, Pattern> patternMap;
         protected Map<String, Contract> contractMap;
         protected Map<String, Employee> employeeMap;
@@ -136,64 +135,44 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
 
         private void generateShiftDateList(NurseRoster nurseRoster,
                 Element startDateElement, Element endDateElement) throws JDOMException {
-            // Mimic JSR-310 LocalDate
-            TimeZone LOCAL_TIMEZONE = TimeZone.getTimeZone("GMT");
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTimeZone(LOCAL_TIMEZONE);
-            calendar.clear();
-            DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            dateFormat.setCalendar(calendar);
-            Date startDate;
+            LocalDate startDate;
             try {
-                startDate = dateFormat.parse(startDateElement.getText());
-            } catch (ParseException e) {
+                startDate = LocalDate.parse(startDateElement.getText(), DateTimeFormatter.ISO_DATE);
+            } catch (DateTimeParseException e) {
                 throw new IllegalArgumentException("Invalid startDate (" + startDateElement.getText() + ").", e);
             }
-            calendar.setTime(startDate);
-            int startDayOfYear = calendar.get(Calendar.DAY_OF_YEAR);
-            int startYear = calendar.get(Calendar.YEAR);
-            Date endDate;
+            int startDayOfYear = startDate.getDayOfYear();
+            int startYear = startDate.getYear();
+            LocalDate endDate;
             try {
-                endDate = dateFormat.parse(endDateElement.getText());
-            } catch (ParseException e) {
+                endDate = LocalDate.parse(endDateElement.getText(), DateTimeFormatter.ISO_DATE);
+            } catch (DateTimeParseException e) {
                 throw new IllegalArgumentException("Invalid endDate (" + endDateElement.getText() + ").", e);
             }
-            calendar.setTime(endDate);
-            int endDayOfYear = calendar.get(Calendar.DAY_OF_YEAR);
-            int endYear = calendar.get(Calendar.YEAR);
-            int maxDayIndex = endDayOfYear - startDayOfYear;
-            if (startYear > endYear) {
-                throw new IllegalStateException("The startYear (" + startYear
-                        + " must be before endYear (" + endYear + ").");
+            int endDayOfYear = startDate.getDayOfYear();
+            int endYear = startDate.getYear();
+            if (startDate.compareTo(endDate) >= 0) {
+                throw new IllegalStateException("The startDate (" + startDate
+                        + " must be before endDate (" + endDate + ").");
             }
-            if (startYear < endYear) {
-                int tmpYear = startYear;
-                calendar.setTime(startDate);
-                while (tmpYear < endYear) {
-                    maxDayIndex += calendar.getActualMaximum(Calendar.DAY_OF_YEAR);
-                    calendar.add(Calendar.YEAR, 1);
-                    tmpYear++;
-                }
-            }
+            int maxDayIndex = Math.toIntExact(DAYS.between(startDate, endDate));
             int shiftDateSize = maxDayIndex + 1;
             List<ShiftDate> shiftDateList = new ArrayList<>(shiftDateSize);
             shiftDateMap = new HashMap<>(shiftDateSize);
             long id = 0L;
             int dayIndex = 0;
-            calendar.setTime(startDate);
+            LocalDate date = startDate;
             for (int i = 0; i < shiftDateSize; i++) {
                 ShiftDate shiftDate = new ShiftDate();
                 shiftDate.setId(id);
                 shiftDate.setDayIndex(dayIndex);
-                String dateString = dateFormat.format(calendar.getTime());
-                shiftDate.setDateString(dateString);
-                shiftDate.setDayOfWeek(DayOfWeek.valueOfCalendar(calendar.get(Calendar.DAY_OF_WEEK)));
+                shiftDate.setDate(date);
                 shiftDate.setShiftList(new ArrayList<>());
                 shiftDateList.add(shiftDate);
-                shiftDateMap.put(dateString, shiftDate);
+                shiftDateMap.put(date, shiftDate);
                 id++;
                 dayIndex++;
-                calendar.add(Calendar.DAY_OF_YEAR, 1);
+                date = date.plusDays(1);
             }
             nurseRoster.setShiftDateList(shiftDateList);
         }
@@ -201,6 +180,7 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
         private void generateNurseRosterInfo(NurseRoster nurseRoster) {
             List<ShiftDate> shiftDateList = nurseRoster.getShiftDateList();
             NurseRosterParametrization nurseRosterParametrization = new NurseRosterParametrization();
+            nurseRosterParametrization.setId(0L);
             nurseRosterParametrization.setFirstShiftDate(shiftDateList.get(0));
             nurseRosterParametrization.setLastShiftDate(shiftDateList.get(shiftDateList.size() - 1));
             nurseRosterParametrization.setPlanningWindowStart(shiftDateList.get(0));
@@ -305,7 +285,7 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                     shift.setIndex(index);
                     shift.setRequiredEmployeeSize(0); // Filled in later
                     shiftList.add(shift);
-                    dateAndShiftTypeToShiftMap.put(Arrays.asList(shiftDate.getDateString(), shiftType.getCode()), shift);
+                    dateAndShiftTypeToShiftMap.put(Pair.of(shiftDate.getDate(), shiftType.getCode()), shift);
                     addShiftToDayOfWeekAndShiftTypeToShiftListMap(shiftDate, shiftType, shift);
                     id++;
                     index++;
@@ -316,12 +296,9 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
 
         private void addShiftToDayOfWeekAndShiftTypeToShiftListMap(ShiftDate shiftDate, ShiftType shiftType,
                 Shift shift) {
-            List<Object> key = Arrays.<Object>asList(shiftDate.getDayOfWeek(), shiftType);
-            List<Shift> dayOfWeekAndShiftTypeToShiftList = dayOfWeekAndShiftTypeToShiftListMap.get(key);
-            if (dayOfWeekAndShiftTypeToShiftList == null) {
-                dayOfWeekAndShiftTypeToShiftList = new ArrayList<>((shiftDateMap.size() + 6) / 7);
-                dayOfWeekAndShiftTypeToShiftListMap.put(key, dayOfWeekAndShiftTypeToShiftList);
-            }
+            Pair<DayOfWeek, ShiftType> key = Pair.of(shiftDate.getDayOfWeek(), shiftType);
+            List<Shift> dayOfWeekAndShiftTypeToShiftList = dayOfWeekAndShiftTypeToShiftListMap.computeIfAbsent(key,
+                    k -> new ArrayList<>((shiftDateMap.size() + 6) / 7));
             dayOfWeekAndShiftTypeToShiftList.add(shift);
         }
 
@@ -375,7 +352,7 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                     pattern.setCode(code);
                     pattern.setWeight(weight);
                     int patternEntryIndex = 0;
-                    DayOfWeek firstDayOfweek = null;
+                    DayOfWeek firstDayOfWeek = null;
                     for (Element patternEntryElement : patternEntryElementList) {
                         assertElementName(patternEntryElement, "PatternEntry");
                         Element shiftTypeElement = patternEntryElement.getChild("ShiftType");
@@ -400,17 +377,27 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                         if (dayElement.getText().equals("Any")) {
                             dayOfWeek = null;
                         } else {
-                            dayOfWeek = DayOfWeek.valueOfCode(dayElement.getText());
+                            dayOfWeek = null;
+                            for (DayOfWeek possibleDayOfWeek : DayOfWeek.values()) {
+                                if (possibleDayOfWeek.name().equalsIgnoreCase(dayElement.getText())) {
+                                    dayOfWeek = possibleDayOfWeek;
+                                    break;
+                                }
+                            }
                             if (dayOfWeek == null) {
                                 throw new IllegalArgumentException("The dayOfWeek (" + dayElement.getText()
                                         + ") of pattern (" + pattern.getCode() + ") does not exist.");
                             }
                         }
                         if (patternEntryIndex == 0) {
-                            firstDayOfweek = dayOfWeek;
+                            firstDayOfWeek = dayOfWeek;
                         } else {
-                            if (firstDayOfweek != null) {
-                                if (firstDayOfweek.getDistanceToNext(dayOfWeek) != patternEntryIndex) {
+                            if (firstDayOfWeek != null) {
+                                int distance = dayOfWeek.getValue() - firstDayOfWeek.getValue();
+                                if (distance < 0) {
+                                    distance += 7;
+                                }
+                                if (distance != patternEntryIndex) {
                                     throw new IllegalArgumentException("On patternEntryIndex (" + patternEntryIndex
                                             + ") of pattern (" + pattern.getCode()
                                             + ") the dayOfWeek (" + dayOfWeek
@@ -809,7 +796,13 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
             for (Element element : coverRequirementElementList) {
                 if (element.getName().equals("DayOfWeekCover")) {
                     Element dayOfWeekElement = element.getChild("Day");
-                    DayOfWeek dayOfWeek = DayOfWeek.valueOfCode(dayOfWeekElement.getText());
+                    DayOfWeek dayOfWeek = null;
+                    for (DayOfWeek possibleDayOfWeek : DayOfWeek.values()) {
+                        if (possibleDayOfWeek.name().equalsIgnoreCase(dayOfWeekElement.getText())) {
+                            dayOfWeek = possibleDayOfWeek;
+                            break;
+                        }
+                    }
                     if (dayOfWeek == null) {
                         throw new IllegalArgumentException("The dayOfWeek (" + dayOfWeekElement.getText()
                                 + ") of an entity DayOfWeekCover does not exist.");
@@ -829,7 +822,7 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                                         + ") of an entity DayOfWeekCover does not exist.");
                             }
                         }
-                        List<Object> key = Arrays.<Object>asList(dayOfWeek, shiftType);
+                        Pair<DayOfWeek, ShiftType> key = Pair.of(dayOfWeek, shiftType);
                         List<Shift> shiftList = dayOfWeekAndShiftTypeToShiftListMap.get(key);
                         if (shiftList == null) {
                             throw new IllegalArgumentException("The dayOfWeek (" + dayOfWeekElement.getText()
@@ -846,7 +839,8 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                     List<Element> coverElementList = (List<Element>) element.getChildren("Cover");
                     for (Element coverElement : coverElementList) {
                         Element shiftTypeElement = coverElement.getChild("Shift");
-                        Shift shift = dateAndShiftTypeToShiftMap.get(Arrays.asList(dateElement.getText(), shiftTypeElement.getText()));
+                        LocalDate date = LocalDate.parse(dateElement.getText(), DateTimeFormatter.ISO_DATE);
+                        Shift shift = dateAndShiftTypeToShiftMap.get(Pair.of(date, shiftTypeElement.getText()));
                         if (shift == null) {
                             throw new IllegalArgumentException("The date (" + dateElement.getText()
                                     + ") with the shiftType (" + shiftTypeElement.getText()
@@ -883,7 +877,7 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                     dayOffRequest.setEmployee(employee);
 
                     Element dateElement = element.getChild("Date");
-                    ShiftDate shiftDate = shiftDateMap.get(dateElement.getText());
+                    ShiftDate shiftDate = shiftDateMap.get(LocalDate.parse(dateElement.getText(), DateTimeFormatter.ISO_DATE));
                     if (shiftDate == null) {
                         throw new IllegalArgumentException("The date (" + dateElement.getText()
                                 + ") of dayOffRequest (" + dayOffRequest + ") does not exist.");
@@ -922,7 +916,7 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
                     dayOnRequest.setEmployee(employee);
 
                     Element dateElement = element.getChild("Date");
-                    ShiftDate shiftDate = shiftDateMap.get(dateElement.getText());
+                    ShiftDate shiftDate = shiftDateMap.get(LocalDate.parse(dateElement.getText(), DateTimeFormatter.ISO_DATE));
                     if (shiftDate == null) {
                         throw new IllegalArgumentException("The date (" + dateElement.getText()
                                 + ") of dayOnRequest (" + dayOnRequest + ") does not exist.");
@@ -962,7 +956,8 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
 
                     Element dateElement = element.getChild("Date");
                     Element shiftTypeElement = element.getChild("ShiftTypeID");
-                    Shift shift = dateAndShiftTypeToShiftMap.get(Arrays.asList(dateElement.getText(), shiftTypeElement.getText()));
+                    LocalDate date = LocalDate.parse(dateElement.getText(), DateTimeFormatter.ISO_DATE);
+                    Shift shift = dateAndShiftTypeToShiftMap.get(Pair.of(date, shiftTypeElement.getText()));
                     if (shift == null) {
                         throw new IllegalArgumentException("The date (" + dateElement.getText()
                                 + ") or the shiftType (" + shiftTypeElement.getText()
@@ -1003,7 +998,8 @@ public class NurseRosteringImporter extends AbstractXmlSolutionImporter<NurseRos
 
                     Element dateElement = element.getChild("Date");
                     Element shiftTypeElement = element.getChild("ShiftTypeID");
-                    Shift shift = dateAndShiftTypeToShiftMap.get(Arrays.asList(dateElement.getText(), shiftTypeElement.getText()));
+                    LocalDate date = LocalDate.parse(dateElement.getText(), DateTimeFormatter.ISO_DATE);
+                    Shift shift = dateAndShiftTypeToShiftMap.get(Pair.of(date, shiftTypeElement.getText()));
                     if (shift == null) {
                         throw new IllegalArgumentException("The date (" + dateElement.getText()
                                 + ") or the shiftType (" + shiftTypeElement.getText()

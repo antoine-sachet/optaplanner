@@ -16,6 +16,7 @@
 
 package org.optaplanner.core.impl.domain.solution.cloner;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -41,11 +42,13 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentMap;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.domain.solution.cloner.DeepPlanningClone;
 import org.optaplanner.core.api.domain.solution.cloner.SolutionCloner;
+import org.optaplanner.core.impl.domain.common.ConcurrentMemoization;
 import org.optaplanner.core.impl.domain.common.ReflectionHelper;
 import org.optaplanner.core.impl.domain.common.accessor.MemberAccessor;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
@@ -57,10 +60,10 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
 
     protected final SolutionDescriptor<Solution_> solutionDescriptor;
 
-    protected final Map<Class, Constructor> constructorCache = new HashMap<>();
-    protected final Map<Class, List<Field>> fieldListCache = new HashMap<>();
-    protected final Map<Pair<Field, Class>, Boolean> deepCloneDecisionFieldCache = new HashMap<>();
-    protected final Map<Class, Boolean> deepCloneDecisionActualValueClassCache = new HashMap<>();
+    protected final ConcurrentMap<Class<?>, Constructor<?>> constructorMemoization = new ConcurrentMemoization<>();
+    protected final ConcurrentMap<Class<?>, List<Field>> fieldListMemoization = new ConcurrentMemoization<>();
+    protected final ConcurrentMap<Pair<Field, Class<?>>, Boolean> fieldDeepClonedMemoization = new ConcurrentMemoization<>();
+    protected final ConcurrentMap<Class<?>, Boolean> actualValueClassDeepClonedMemoization = new ConcurrentMemoization<>();
 
     public FieldAccessingSolutionCloner(SolutionDescriptor<Solution_> solutionDescriptor) {
         this.solutionDescriptor = solutionDescriptor;
@@ -75,52 +78,68 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
         return new FieldAccessingSolutionClonerRun().cloneSolution(originalSolution);
     }
 
-    protected <C> Constructor<C> retrieveCachedConstructor(Class<C> clazz) throws NoSuchMethodException {
-        Constructor<C> constructor = constructorCache.get(clazz);
-        if (constructor == null) {
-            constructor = clazz.getDeclaredConstructor();
+    /**
+     * This method is thread-safe.
+     * @param clazz never null
+     * @param <C> type
+     * @return never null
+     */
+    @SuppressWarnings("unchecked")
+    protected <C> Constructor<C> retrieveCachedConstructor(Class<C> clazz) {
+        return (Constructor<C>) constructorMemoization.computeIfAbsent(clazz, key -> {
+            Constructor<C> constructor;
+            try {
+                constructor = clazz.getDeclaredConstructor();
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("The class (" + clazz
+                        + ") should have a no-arg constructor to create a planning clone.", e);
+            }
             constructor.setAccessible(true);
-            constructorCache.put(clazz, constructor);
-        }
-        return constructor;
+            return constructor;
+        });
     }
 
+    /**
+     * This method is thread-safe.
+     * @param clazz never null
+     * @param <C> type
+     * @return never null
+     */
     protected <C> List<Field> retrieveCachedFields(Class<C> clazz) {
-        List<Field> fieldList = fieldListCache.get(clazz);
-        if (fieldList == null) {
+        return fieldListMemoization.computeIfAbsent(clazz, key -> {
             Field[] fields = clazz.getDeclaredFields();
-            fieldList = new ArrayList<>(fields.length);
+            List<Field> fieldList = new ArrayList<>(fields.length);
             for (Field field : fields) {
                 if (!Modifier.isStatic(field.getModifiers())) {
                     field.setAccessible(true);
                     fieldList.add(field);
                 }
             }
-            fieldListCache.put(clazz, fieldList);
-        }
-        return fieldList;
+            return fieldList;
+        });
     }
 
-    protected boolean retrieveDeepCloneDecision(Field field, Class fieldInstanceClass, Class<?> actualValueClass) {
-        Pair<Field, Class> pair = Pair.of(field, fieldInstanceClass);
-        Boolean deepCloneDecision = deepCloneDecisionFieldCache.get(pair);
-        if (deepCloneDecision == null) {
-            deepCloneDecision = isFieldDeepCloned(field, fieldInstanceClass);
-            deepCloneDecisionFieldCache.put(pair, deepCloneDecision);
-        }
-        if (deepCloneDecision) {
-            return true;
-        }
-        return retrieveDeepCloneDecisionForActualValueClass(actualValueClass);
+    /**
+     * This method is thread-safe.
+     * @param field never null
+     * @param fieldInstanceClass never null
+     * @param actualValueClass never null
+     * @return never null
+     */
+    protected boolean retrieveDeepCloneDecision(Field field, Class<?> fieldInstanceClass, Class<?> actualValueClass) {
+        Pair<Field, Class<?>> pair = Pair.of(field, fieldInstanceClass);
+        Boolean deepCloneDecision = fieldDeepClonedMemoization.computeIfAbsent(pair,
+                key -> isFieldDeepCloned(field, fieldInstanceClass));
+        return deepCloneDecision || retrieveDeepCloneDecisionForActualValueClass(actualValueClass);
     }
 
-    private boolean isFieldDeepCloned(Field field, Class fieldInstanceClass) {
+    private boolean isFieldDeepCloned(Field field, Class<?> fieldInstanceClass) {
         return isFieldAnEntityPropertyOnSolution(field, fieldInstanceClass)
                 || isFieldAnEntityOrSolution(field, fieldInstanceClass)
                 || isFieldADeepCloneProperty(field, fieldInstanceClass);
     }
 
-    protected boolean isFieldAnEntityPropertyOnSolution(Field field, Class fieldInstanceClass) {
+    protected boolean isFieldAnEntityPropertyOnSolution(Field field, Class<?> fieldInstanceClass) {
         // field.getDeclaringClass() is a superclass of or equal to the fieldInstanceClass
         if (solutionDescriptor.getSolutionClass().isAssignableFrom(fieldInstanceClass)) {
             String fieldName = field.getName();
@@ -138,13 +157,17 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
         return false;
     }
 
-    protected boolean isFieldAnEntityOrSolution(Field field, Class fieldInstanceClass) {
+    protected boolean isFieldAnEntityOrSolution(Field field, Class<?> fieldInstanceClass) {
         Class<?> type = field.getType();
         if (isClassDeepCloned(type)) {
             return true;
         }
         if (Collection.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type)) {
             if (isTypeArgumentDeepCloned(field.getGenericType())) {
+                return true;
+            }
+        } else if (type.isArray()) {
+            if (isClassDeepCloned(type.getComponentType())) {
                 return true;
             }
         }
@@ -169,7 +192,7 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
         return false;
     }
 
-    private boolean isFieldADeepCloneProperty(Field field, Class fieldInstanceClass) {
+    private boolean isFieldADeepCloneProperty(Field field, Class<?> fieldInstanceClass) {
         if (field.isAnnotationPresent(DeepPlanningClone.class)) {
             return true;
         }
@@ -180,13 +203,14 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
         return false;
     }
 
+    /**
+     * This method is thread-safe.
+     * @param actualValueClass never null
+     * @return never null
+     */
     protected boolean retrieveDeepCloneDecisionForActualValueClass(Class<?> actualValueClass) {
-        Boolean deepCloneDecision = deepCloneDecisionActualValueClassCache.get(actualValueClass);
-        if (deepCloneDecision == null) {
-            deepCloneDecision = isClassDeepCloned(actualValueClass);
-            deepCloneDecisionActualValueClassCache.put(actualValueClass, deepCloneDecision);
-        }
-        return deepCloneDecision;
+        return actualValueClassDeepClonedMemoization.computeIfAbsent(actualValueClass,
+                key -> isClassDeepCloned(actualValueClass));
     }
 
     protected boolean isClassDeepCloned(Class<?> type) {
@@ -232,7 +256,7 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
                 return constructor.newInstance();
             } catch (ReflectiveOperationException e) {
                 throw new IllegalStateException("The class (" + clazz
-                        + ") should have a no-arg constructor to create a clone.", e);
+                        + ") should have a no-arg constructor to create a planning clone.", e);
             }
         }
 
@@ -253,7 +277,7 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
             }
         }
 
-        protected boolean isDeepCloneField(Field field, Class fieldInstanceClass, Object originalValue) {
+        protected boolean isDeepCloneField(Field field, Class<?> fieldInstanceClass, Object originalValue) {
             if (originalValue == null) {
                 return false;
             }
@@ -273,10 +297,28 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
                 cloneValue = cloneCollection(unprocessed.field.getType(), (Collection<?>) unprocessed.originalValue);
             } else if (unprocessed.originalValue instanceof Map) {
                 cloneValue = cloneMap(unprocessed.field.getType(), (Map<?, ?>) unprocessed.originalValue);
+            } else if (unprocessed.originalValue.getClass().isArray()) {
+                cloneValue = cloneArray(unprocessed.field.getType(), unprocessed.originalValue);
             } else {
                 cloneValue = clone(unprocessed.originalValue);
             }
             setFieldValue(unprocessed.bean, unprocessed.field, cloneValue);
+        }
+
+        protected Object cloneArray(Class<?> expectedType, Object originalArray) {
+            int arrayLength = Array.getLength(originalArray);
+            Object cloneArray = Array.newInstance(originalArray.getClass().getComponentType(), arrayLength);
+            if (!expectedType.isInstance(cloneArray)) {
+                throw new IllegalStateException("The cloneArrayClass (" + cloneArray.getClass()
+                        + ") created for originalArrayClass (" + originalArray.getClass()
+                        + ") is not assignable to the field's type (" + expectedType + ").\n"
+                        + "Maybe consider replacing the default " + SolutionCloner.class.getSimpleName() + ".");
+            }
+            for (int i = 0; i < arrayLength; i++) {
+                Object cloneElement = cloneCollectionsElementIfNeeded(Array.get(originalArray, i));
+                Array.set(cloneArray, i, cloneElement);
+            }
+            return cloneArray;
         }
 
         protected <E> Collection<E> cloneCollection(Class<?> expectedType, Collection<E> originalCollection) {
@@ -284,8 +326,8 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
             if (!expectedType.isInstance(cloneCollection)) {
                 throw new IllegalStateException("The cloneCollectionClass (" + cloneCollection.getClass()
                         + ") created for originalCollectionClass (" + originalCollection.getClass()
-                        + ") is not assignable to the field's type (" + expectedType + ")."
-                        + " Consider replacing the default " + SolutionCloner.class.getSimpleName() + ".");
+                        + ") is not assignable to the field's type (" + expectedType + ").\n"
+                        + "Maybe consider replacing the default " + SolutionCloner.class.getSimpleName() + ".");
             }
             for (E originalElement : originalCollection) {
                 E cloneElement = cloneCollectionsElementIfNeeded(originalElement);
@@ -328,8 +370,8 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
             if (!expectedType.isInstance(cloneMap)) {
                 throw new IllegalStateException("The cloneMapClass (" + cloneMap.getClass()
                         + ") created for originalMapClass (" + originalMap.getClass()
-                        + ") is not assignable to the field's type (" + expectedType + ")."
-                        + " Consider replacing the default " + SolutionCloner.class.getSimpleName() + ".");
+                        + ") is not assignable to the field's type (" + expectedType + ").\n"
+                        + "Maybe consider replacing the default " + SolutionCloner.class.getSimpleName() + ".");
             }
             for (Map.Entry<K, V> originalEntry : originalMap.entrySet()) {
                 K cloneKey = cloneCollectionsElementIfNeeded(originalEntry.getKey());
@@ -362,6 +404,8 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
                 return (C) cloneCollection(Collection.class, (Collection) original);
             } else if (original instanceof Map) {
                 return (C) cloneMap(Map.class, (Map) original);
+            } else if (original.getClass().isArray()) {
+                return (C) cloneArray(original.getClass(), original);
             }
             if (retrieveDeepCloneDecisionForActualValueClass(original.getClass())) {
                 return clone(original);
@@ -409,7 +453,7 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
                 return field.get(bean);
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("The class (" + bean.getClass() + ") has a field (" + field
-                        + ") which can not be read to create a clone.", e);
+                        + ") which can not be read to create a planning clone.", e);
             }
         }
 
@@ -418,7 +462,7 @@ public class FieldAccessingSolutionCloner<Solution_> implements SolutionCloner<S
                 field.set(bean, value);
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("The class (" + bean.getClass() + ") has a field (" + field
-                        + ") which can not be written with the value (" + value + ") to create a clone.", e);
+                        + ") which can not be written with the value (" + value + ") to create a planning clone.", e);
             }
         }
 

@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/projectjobscheduling/template</benchmarkDirectory>
   <parallelBenchmarkCount>AUTO</parallelBenchmarkCount>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -27,16 +26,6 @@
       <inputSolutionFile>data/projectjobscheduling/unsolved/B-8.xml</inputSolutionFile>
       <inputSolutionFile>data/projectjobscheduling/unsolved/B-9.xml</inputSolutionFile>
       <inputSolutionFile>data/projectjobscheduling/unsolved/B-10.xml</inputSolutionFile>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
-      <!--<problemStatisticType>STEP_SCORE</problemStatisticType>-->
-      <!--<problemStatisticType>SCORE_CALCULATION_SPEED</problemStatisticType>-->
-      <!--<problemStatisticType>BEST_SOLUTION_MUTATION</problemStatisticType>-->
-      <!--<problemStatisticType>MOVE_COUNT_PER_STEP</problemStatisticType>-->
-      <!--<problemStatisticType>MEMORY_USE</problemStatisticType>-->
-      <!--<singleStatisticType>CONSTRAINT_MATCH_TOTAL_BEST_SCORE</singleStatisticType>-->
-      <!--<singleStatisticType>CONSTRAINT_MATCH_TOTAL_STEP_SCORE</singleStatisticType>-->
-      <!--<singleStatisticType>PICKED_MOVE_TYPE_BEST_SCORE_DIFF</singleStatisticType>-->
-      <!--<singleStatisticType>PICKED_MOVE_TYPE_STEP_SCORE_DIFF</singleStatisticType>-->
     </problemBenchmarks>
 
     <solver>
@@ -44,13 +33,10 @@
       <entityClass>org.optaplanner.examples.projectjobscheduling.domain.Allocation</entityClass>
 
       <scoreDirectorFactory>
-        <scoreDefinitionType>BENDABLE</scoreDefinitionType>
-        <bendableHardLevelsSize>1</bendableHardLevelsSize>
-        <bendableSoftLevelsSize>2</bendableSoftLevelsSize>
         <incrementalScoreCalculatorClass>org.optaplanner.examples.projectjobscheduling.solver.score.ProjectJobSchedulingIncrementalScoreCalculator</incrementalScoreCalculatorClass>
       </scoreDirectorFactory>
       <termination>
-        <secondsSpentLimit>290</secondsSpentLimit>
+        <minutesSpentLimit>5</minutesSpentLimit>
       </termination>
     </solver>
   </inheritedSolverBenchmark>
@@ -65,14 +51,10 @@
       <localSearch>
         <unionMoveSelector>
           <changeMoveSelector>
-            <valueSelector>
-              <variableName>executionMode</variableName>
-            </valueSelector>
+            <valueSelector variableName="executionMode"/>
           </changeMoveSelector>
           <changeMoveSelector>
-            <valueSelector>
-              <variableName>delay</variableName>
-            </valueSelector>
+            <valueSelector variableName="delay"/>
           </changeMoveSelector>
         </unionMoveSelector>
         <acceptor>

@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.optaplanner</groupId>
     <artifactId>optaplanner</artifactId>
-    <version>7.0.0-SNAPSHOT</version>
+    <version>7.14.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>optaplanner-benchmark</artifactId>
@@ -20,9 +20,10 @@
 
     This module contains the benchmarker toolkit.
   </description>
+  <url>https://www.optaplanner.org</url>
 
   <properties>
-    <osgi.Bundle-SymbolicName>org.optaplanner.benchmark</osgi.Bundle-SymbolicName>
+    <java.module.name>org.optaplanner.benchmark</java.module.name>
   </properties>
 
   <dependencies>
@@ -52,8 +53,13 @@
       <artifactId>optaplanner-persistence-xstream</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.optaplanner</groupId>
+      <artifactId>optaplanner-persistence-jaxb</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.drools</groupId>
       <artifactId>drools-core</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <!-- External dependencies -->
     <!-- Common utils -->
@@ -64,10 +70,6 @@
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
     </dependency>
     <!-- Logging -->
     <dependency>
@@ -112,6 +114,10 @@
             </Export-Package>
           </instructions>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.revapi</groupId>
+        <artifactId>revapi-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

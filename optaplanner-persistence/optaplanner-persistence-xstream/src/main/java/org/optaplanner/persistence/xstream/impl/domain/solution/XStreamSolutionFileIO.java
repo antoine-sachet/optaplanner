@@ -27,67 +27,54 @@ import java.io.Writer;
 
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.XStreamException;
-import org.apache.commons.io.IOUtils;
+import com.thoughtworks.xstream.security.AnyTypePermission;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
 
 /**
+ * Security warning: only use this class with XML files from a trusted source,
+ * because {@link XStream} is configured to allow all permissions,
+ * which can be exploited if the XML comes from an untrusted source.
  * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
  */
 public class XStreamSolutionFileIO<Solution_> implements SolutionFileIO<Solution_> {
 
-    public static final String FILE_EXTENSION = "xml";
-
-    private XStream xStream;
-
-    public XStreamSolutionFileIO() {
-        xStream = new XStream();
-        xStream.setMode(XStream.ID_REFERENCES);
-    }
+    protected XStream xStream;
 
     public XStreamSolutionFileIO(Class... xStreamAnnotatedClasses) {
-        this();
+        xStream = new XStream();
+        xStream.setMode(XStream.ID_REFERENCES);
         xStream.processAnnotations(xStreamAnnotatedClasses);
+        XStream.setupDefaultSecurity(xStream);
+        // Presume the XML file comes from a trusted source so it works out of the box. See class javadoc.
+        xStream.addPermission(new AnyTypePermission());
+    }
+
+    public XStream getXStream() {
+        return xStream;
     }
 
     @Override
     public String getInputFileExtension() {
-        return FILE_EXTENSION;
-    }
-
-    @Override
-    public String getOutputFileExtension() {
-        return FILE_EXTENSION;
+        return "xml";
     }
 
     @Override
     public Solution_ read(File inputSolutionFile) {
-        Solution_ unsolvedSolution;
-        Reader reader = null;
-        try {
-            // xStream.fromXml(InputStream) does not use UTF-8
-            reader = new InputStreamReader(new FileInputStream(inputSolutionFile), "UTF-8");
-            unsolvedSolution = (Solution_) xStream.fromXML(reader);
-        } catch (XStreamException e) {
-            throw new IllegalArgumentException("Problem reading inputSolutionFile (" + inputSolutionFile + ").", e);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Problem reading inputSolutionFile (" + inputSolutionFile + ").", e);
-        } finally {
-            IOUtils.closeQuietly(reader);
+        // xStream.fromXml(InputStream) does not use UTF-8
+        try (Reader reader = new InputStreamReader(new FileInputStream(inputSolutionFile), "UTF-8")) {
+            return (Solution_) xStream.fromXML(reader);
+        } catch (XStreamException | IOException e) {
+            throw new IllegalArgumentException("Failed reading inputSolutionFile (" + inputSolutionFile + ").", e);
         }
-        return unsolvedSolution;
     }
 
     @Override
     public void write(Solution_ solution, File outputSolutionFile) {
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(new FileOutputStream(outputSolutionFile), "UTF-8");
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(outputSolutionFile), "UTF-8")) {
             xStream.toXML(solution, writer);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Problem writing outputSolutionFile (" + outputSolutionFile + ").", e);
-        } finally {
-            IOUtils.closeQuietly(writer);
+            throw new IllegalArgumentException("Failed writing outputSolutionFile (" + outputSolutionFile + ").", e);
         }
     }
 

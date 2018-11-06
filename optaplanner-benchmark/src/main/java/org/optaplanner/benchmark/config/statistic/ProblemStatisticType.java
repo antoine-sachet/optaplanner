@@ -22,16 +22,16 @@ import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.StatisticType;
 import org.optaplanner.benchmark.impl.statistic.bestscore.BestScoreProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.bestsolutionmutation.BestSolutionMutationProblemStatistic;
-import org.optaplanner.benchmark.impl.statistic.scorecalculationspeed.ScoreCalculationSpeedProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.memoryuse.MemoryUseProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.movecountperstep.MoveCountPerStepProblemStatistic;
+import org.optaplanner.benchmark.impl.statistic.scorecalculationspeed.ScoreCalculationSpeedProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.stepscore.StepScoreProblemStatistic;
 
 public enum ProblemStatisticType implements StatisticType {
     BEST_SCORE,
     STEP_SCORE,
     /**
-     * @deprecated use {@link #SCORE_CALCULATION_SPEED} instead
+     * @deprecated Use {@link #SCORE_CALCULATION_SPEED} instead. Will be removed in 8.0.
      */
     @Deprecated
     CALCULATE_COUNT_PER_SECOND,

@@ -45,8 +45,11 @@ public class SwapMoveSelectorConfig extends MoveSelectorConfig<SwapMoveSelectorC
     @XStreamAlias("secondaryEntitySelector")
     private EntitySelectorConfig secondaryEntitySelectorConfig = null;
 
-    // TODO jaxb use @XmlElementWrapper and wrap in variableNameIncludes
+    // TODO Wrap in <variableNameIncludes> https://issues.jboss.org/browse/PLANNER-838
     @XStreamImplicit(itemFieldName = "variableNameInclude")
+//    @XStreamAlias("variableNameIncludes")
+//    @XStreamConverter(value = NamedCollectionConverter.class,
+//            strings = {"variableNameInclude"}, types = {String.class}, useImplicitType = false)
     private List<String> variableNameIncludeList = null;
 
     public EntitySelectorConfig getEntitySelectorConfig() {
@@ -104,10 +107,10 @@ public class SwapMoveSelectorConfig extends MoveSelectorConfig<SwapMoveSelectorC
             EntityDescriptor onlySecondaryEntityDescriptor = secondaryEntitySelectorConfig.extractEntityDescriptor(configPolicy);
             if (onlyEntityDescriptor != onlySecondaryEntityDescriptor) {
                 throw new IllegalArgumentException("The entitySelector (" + entitySelectorConfig
-                        + ")'s entityDescriptor (" + onlyEntityDescriptor
+                        + ")'s entityClass (" + (onlyEntityDescriptor == null ? null : onlyEntityDescriptor.getEntityClass())
                         + ") and secondaryEntitySelectorConfig (" + secondaryEntitySelectorConfig
-                        + ")'s entityDescriptor (" + onlySecondaryEntityDescriptor
-                        + ") must have the same entity class.");
+                        + ")'s entityClass (" + (onlySecondaryEntityDescriptor == null ? null : onlySecondaryEntityDescriptor.getEntityClass())
+                        + ") must be the same entity class.");
             }
         }
         if (onlyEntityDescriptor != null) {

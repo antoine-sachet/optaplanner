@@ -23,13 +23,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.examples.common.persistence.AbstractTxtSolutionImporter;
+import org.optaplanner.examples.common.persistence.SolutionConverter;
+import org.optaplanner.examples.machinereassignment.app.MachineReassignmentApp;
 import org.optaplanner.examples.machinereassignment.domain.MachineReassignment;
 import org.optaplanner.examples.machinereassignment.domain.MrBalancePenalty;
 import org.optaplanner.examples.machinereassignment.domain.MrGlobalPenaltyInfo;
@@ -46,32 +46,24 @@ import org.optaplanner.examples.machinereassignment.domain.MrService;
 public class MachineReassignmentImporter extends AbstractTxtSolutionImporter<MachineReassignment> {
 
     public static void main(String[] args) {
-        new MachineReassignmentImporter().convertAll();
-    }
-
-    public MachineReassignmentImporter() {
-        super(new MachineReassignmentDao());
-    }
-
-    @Override
-    public boolean acceptInputFileDuringBulkConvert(File inputFile) {
-        // Blacklist: too big to write as XML
-        return !Arrays.asList(
-                "model_b_1.txt",
-                "model_b_2.txt",
-                "model_b_3.txt",
-                "model_b_4.txt",
-                "model_b_5.txt",
-                "model_b_6.txt",
-                "model_b_7.txt",
-                "model_b_8.txt",
-                "model_b_9.txt",
-                "model_b_10.txt").contains(inputFile.getName());
+        SolutionConverter<MachineReassignment> converter = SolutionConverter.createImportConverter(
+                MachineReassignmentApp.DATA_DIR_NAME, new MachineReassignmentImporter(), MachineReassignment.class);
+        converter.convert("model_a1_1.txt");
+        converter.convert("model_a1_2.txt");
+        converter.convert("model_a1_3.txt");
+        converter.convert("model_a1_4.txt");
+        converter.convert("model_a1_5.txt");
+        converter.convert("model_a2_1.txt");
+        converter.convert("model_a2_2.txt");
+        converter.convert("model_a2_3.txt");
+        converter.convert("model_a2_4.txt");
+        converter.convert("model_a2_5.txt");
+        // model_b's are too big to write as XML
     }
 
     @Override
     public String getInputFileSuffix() {
-        return MachineReassignmentFileIO.FILE_EXTENSION;
+        return "txt";
     }
 
     @Override
@@ -79,7 +71,7 @@ public class MachineReassignmentImporter extends AbstractTxtSolutionImporter<Mac
         return new MachineReassignmentInputBuilder();
     }
 
-    public static class MachineReassignmentInputBuilder extends TxtInputBuilder {
+    public static class MachineReassignmentInputBuilder extends TxtInputBuilder<MachineReassignment> {
 
         private MachineReassignment machineReassignment;
 
@@ -354,23 +346,17 @@ public class MachineReassignmentImporter extends AbstractTxtSolutionImporter<Mac
             }
             File assignmentInputFile = new File(inputFile.getParent(),
                     inputFileName.replaceFirst(inputFilePrefix, "assignment_").replaceAll("\\.txt$", ".sol"));
-            BufferedReader assignmentBufferedReader = null;
-            try {
-                assignmentBufferedReader = new BufferedReader(new InputStreamReader(
-                        new FileInputStream(assignmentInputFile), "UTF-8"));
-                try {
-                    return assignmentBufferedReader.readLine();
-                } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException("Exception in assignmentInputFile ("
-                            + assignmentInputFile + ")", e);
-                } catch (IllegalStateException e) {
-                    throw new IllegalStateException("Exception in assignmentInputFile ("
-                            + assignmentInputFile + ")", e);
-                }
+            try (BufferedReader assignmentBufferedReader = new BufferedReader(new InputStreamReader(
+                        new FileInputStream(assignmentInputFile), "UTF-8"))) {
+                return assignmentBufferedReader.readLine();
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Exception in assignmentInputFile ("
+                        + assignmentInputFile + ")", e);
+            } catch (IllegalStateException e) {
+                throw new IllegalStateException("Exception in assignmentInputFile ("
+                        + assignmentInputFile + ")", e);
             } catch (IOException e) {
                 throw new IllegalArgumentException("Could not read the file (" + assignmentInputFile.getName() + ").", e);
-            } finally {
-                IOUtils.closeQuietly(assignmentBufferedReader);
             }
         }
 

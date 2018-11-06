@@ -18,7 +18,6 @@ package org.optaplanner.core.api.score.buildin.simpledouble;
 
 import org.optaplanner.core.api.score.AbstractScore;
 import org.optaplanner.core.api.score.Score;
-import org.optaplanner.core.api.score.buildin.simple.SimpleScore;
 import org.optaplanner.core.api.score.buildin.simplebigdecimal.SimpleBigDecimalScore;
 
 /**
@@ -33,18 +32,36 @@ import org.optaplanner.core.api.score.buildin.simplebigdecimal.SimpleBigDecimalS
  */
 public final class SimpleDoubleScore extends AbstractScore<SimpleDoubleScore> {
 
+    public static final SimpleDoubleScore ZERO = new SimpleDoubleScore(0, 0.0);
+
     public static SimpleDoubleScore parseScore(String scoreString) {
         String[] scoreTokens = parseScoreTokens(SimpleDoubleScore.class, scoreString, "");
         int initScore = parseInitScore(SimpleDoubleScore.class, scoreString, scoreTokens[0]);
         double score = parseLevelAsDouble(SimpleDoubleScore.class, scoreString, scoreTokens[1]);
-        return valueOf(initScore, score);
+        return ofUninitialized(initScore, score);
     }
 
-    public static SimpleDoubleScore valueOf(int initScore, double score) {
+    public static SimpleDoubleScore ofUninitialized(int initScore, double score) {
         return new SimpleDoubleScore(initScore, score);
     }
 
-    public static SimpleDoubleScore valueOfInitialized(double score) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, double)}
+     */
+    @Deprecated
+    public static SimpleDoubleScore valueOfUninitialized(int initScore, double score) {
+        return new SimpleDoubleScore(initScore, score);
+    }
+
+    public static SimpleDoubleScore of(double score) {
+        return new SimpleDoubleScore(0, score);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(double)}
+     */
+    @Deprecated
+    public static SimpleDoubleScore valueOf(double score) {
         return new SimpleDoubleScore(0, score);
     }
 
@@ -87,6 +104,12 @@ public final class SimpleDoubleScore extends AbstractScore<SimpleDoubleScore> {
     @Override
     public SimpleDoubleScore toInitializedScore() {
         return initScore == 0 ? this : new SimpleDoubleScore(0, score);
+    }
+
+    @Override
+    public SimpleDoubleScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new SimpleDoubleScore(newInitScore, score);
     }
 
     @Override
@@ -134,6 +157,7 @@ public final class SimpleDoubleScore extends AbstractScore<SimpleDoubleScore> {
         return new Number[]{score};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -147,10 +171,11 @@ public final class SimpleDoubleScore extends AbstractScore<SimpleDoubleScore> {
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return (((17 * 37)
-                + initScore)) * 37
+        return ((17 * 37)
+                + initScore) * 37
                 + Double.valueOf(score).hashCode();
     }
 
@@ -163,9 +188,20 @@ public final class SimpleDoubleScore extends AbstractScore<SimpleDoubleScore> {
             return Double.compare(score, other.getScore());
         }
     }
+
+    @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((Double) n).doubleValue() != 0.0, "");
+    }
+
     @Override
     public String toString() {
         return getInitPrefix() + score;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof SimpleDoubleScore;
     }
 
 }

@@ -23,10 +23,10 @@ import org.optaplanner.core.config.constructionheuristic.ConstructionHeuristicPh
 import org.optaplanner.core.config.exhaustivesearch.ExhaustiveSearchPhaseConfig;
 import org.optaplanner.core.config.heuristic.policy.HeuristicConfigPolicy;
 import org.optaplanner.core.config.localsearch.LocalSearchPhaseConfig;
+import org.optaplanner.core.config.partitionedsearch.PartitionedSearchPhaseConfig;
 import org.optaplanner.core.config.phase.custom.CustomPhaseConfig;
 import org.optaplanner.core.config.solver.termination.TerminationConfig;
 import org.optaplanner.core.config.util.ConfigUtils;
-import org.optaplanner.core.impl.phase.AbstractPhase;
 import org.optaplanner.core.impl.phase.Phase;
 import org.optaplanner.core.impl.solver.recaller.BestSolutionRecaller;
 import org.optaplanner.core.impl.solver.termination.PhaseToSolverTerminationBridge;
@@ -34,9 +34,11 @@ import org.optaplanner.core.impl.solver.termination.Termination;
 
 @XStreamInclude({
         CustomPhaseConfig.class,
+        NoChangePhaseConfig.class,
         ExhaustiveSearchPhaseConfig.class,
         ConstructionHeuristicPhaseConfig.class,
-        LocalSearchPhaseConfig.class
+        LocalSearchPhaseConfig.class,
+        PartitionedSearchPhaseConfig.class
 })
 public abstract class PhaseConfig<C extends PhaseConfig> extends AbstractConfig<C> {
 
@@ -45,6 +47,10 @@ public abstract class PhaseConfig<C extends PhaseConfig> extends AbstractConfig<
 
     @XStreamAlias("termination")
     private TerminationConfig terminationConfig = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public TerminationConfig getTerminationConfig() {
         return terminationConfig;
@@ -61,14 +67,13 @@ public abstract class PhaseConfig<C extends PhaseConfig> extends AbstractConfig<
     public abstract Phase buildPhase(int phaseIndex,
             HeuristicConfigPolicy solverConfigPolicy, BestSolutionRecaller bestSolutionRecaller, Termination solverTermination);
 
-    protected void configurePhase(AbstractPhase phase, int phaseIndex,
-            HeuristicConfigPolicy configPolicy, BestSolutionRecaller bestSolutionRecaller, Termination solverTermination) {
-        phase.setPhaseIndex(phaseIndex);
-        phase.setBestSolutionRecaller(bestSolutionRecaller);
+    protected Termination buildPhaseTermination(HeuristicConfigPolicy configPolicy, Termination solverTermination) {
         TerminationConfig terminationConfig_ = terminationConfig == null ? new TerminationConfig()
                 : terminationConfig;
-        phase.setTermination(terminationConfig_.buildTermination(configPolicy,
-                new PhaseToSolverTerminationBridge(solverTermination)));
+        // In case of childThread PART_THREAD, the solverTermination is actually the parent phase's phaseTermination
+        // with the bridge removed, so it's ok to add it again
+        Termination phaseTermination = new PhaseToSolverTerminationBridge(solverTermination);
+        return terminationConfig_.buildTermination(configPolicy, phaseTermination);
     }
 
     @Override

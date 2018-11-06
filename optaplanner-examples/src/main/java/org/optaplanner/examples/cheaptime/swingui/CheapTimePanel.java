@@ -18,8 +18,6 @@ package org.optaplanner.examples.cheaptime.swingui;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,18 +67,10 @@ public class CheapTimePanel extends SolutionPanel<CheapTimeSolution> {
         setLayout(new BorderLayout());
         groupByMachineCheckBox = new JCheckBox("Group by assigned machine", false);
         groupByMachineCheckBox.setHorizontalAlignment(SwingConstants.RIGHT);
-        groupByMachineCheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                updatePanel(getSolution());
-                validate();
-            }
+        groupByMachineCheckBox.addActionListener(e -> {
+            updatePanel(getSolution());
+            validate();
         });
-    }
-
-    @Override
-    public boolean isRefreshScreenDuringSolving() {
-        return true;
     }
 
     @Override

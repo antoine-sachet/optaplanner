@@ -47,15 +47,17 @@ public abstract class AbstractConfig<C extends AbstractConfig> {
         Class<C> configClass = (Class<C>) getClass();
         try {
             return configClass.newInstance();
-        } catch (InstantiationException e) {
-            throw new IllegalStateException("The configClass (" + configClass
-                    + ") does not have a public no-arg constructor.\n"
-                    + "This is a bug, please report an issue with this stacktrace.", e);
-        } catch (IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             throw new IllegalStateException("The configClass (" + configClass
                     + ") does not have a public no-arg constructor.\n"
                     + "This is a bug, please report an issue with this stacktrace.", e);
         }
+    }
+
+    public C copyConfig() {
+        C copy = newInstance();
+        copy.inherit(this);
+        return copy;
     }
 
     // ************************************************************************
@@ -82,7 +84,7 @@ public abstract class AbstractConfig<C extends AbstractConfig> {
                         + ") has no entityClass (" + entityClass
                         + ") configured and because there are multiple in the entityClassSet ("
                         + solutionDescriptor.getEntityClassSet()
-                        + "), it can not be deducted automatically.");
+                        + "), it can not be deduced automatically.");
             }
             entityDescriptor = entityDescriptors.iterator().next();
         }
@@ -110,7 +112,7 @@ public abstract class AbstractConfig<C extends AbstractConfig> {
                         + ") for entityClass (" + entityDescriptor.getEntityClass()
                         + ") and because there are multiple variableNames ("
                         + entityDescriptor.getGenuineVariableNameSet()
-                        + "), it can not be deducted automatically.");
+                        + "), it can not be deduced automatically.");
             }
             variableDescriptor = variableDescriptors.iterator().next();
         }

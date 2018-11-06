@@ -60,10 +60,18 @@ public class GenuineVariableDescriptor<Solution_> extends VariableDescriptor<Sol
     private SelectionSorter increasingStrengthSorter;
     private SelectionSorter decreasingStrengthSorter;
 
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
+
     public GenuineVariableDescriptor(EntityDescriptor<Solution_> entityDescriptor,
             MemberAccessor variableMemberAccessor) {
         super(entityDescriptor, variableMemberAccessor);
     }
+
+    // ************************************************************************
+    // Lifecycle methods
+    // ************************************************************************
 
     public void processAnnotations(DescriptorPolicy descriptorPolicy) {
         processPropertyAnnotations(descriptorPolicy);
@@ -114,11 +122,6 @@ public class GenuineVariableDescriptor<Solution_> extends VariableDescriptor<Sol
             throw new IllegalArgumentException("The entityClass (" + entityDescriptor.getEntityClass()
                     + ") has a PlanningVariable annotated property (" + variableMemberAccessor.getName()
                     + ") with chained (" + chained + "), which is not compatible with nullable (" + nullable + ").");
-        }
-        if (chained && entityDescriptor.hasMovableEntitySelectionFilter()) {
-            movableChainedTrailingValueFilter = new MovableChainedTrailingValueFilter(this);
-        } else {
-            movableChainedTrailingValueFilter = null;
         }
     }
 
@@ -200,6 +203,15 @@ public class GenuineVariableDescriptor<Solution_> extends VariableDescriptor<Sol
                     strengthWeightFactory, SelectionSorterOrder.ASCENDING);
             decreasingStrengthSorter = new WeightFactorySelectionSorter(
                     strengthWeightFactory, SelectionSorterOrder.DESCENDING);
+        }
+    }
+
+    @Override
+    public void linkVariableDescriptors(DescriptorPolicy descriptorPolicy) {
+        if (chained && entityDescriptor.hasEffectiveMovableEntitySelectionFilter()) {
+            movableChainedTrailingValueFilter = new MovableChainedTrailingValueFilter(this);
+        } else {
+            movableChainedTrailingValueFilter = null;
         }
     }
 

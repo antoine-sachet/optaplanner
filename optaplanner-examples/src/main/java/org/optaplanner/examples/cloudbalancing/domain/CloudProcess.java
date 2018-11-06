@@ -19,8 +19,8 @@ package org.optaplanner.examples.cloudbalancing.domain;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import org.optaplanner.core.api.domain.entity.PlanningEntity;
 import org.optaplanner.core.api.domain.variable.PlanningVariable;
-import org.optaplanner.examples.cloudbalancing.domain.solver.CloudComputerStrengthComparator;
-import org.optaplanner.examples.cloudbalancing.domain.solver.CloudProcessDifficultyComparator;
+import org.optaplanner.examples.cloudbalancing.optional.domain.CloudComputerStrengthComparator;
+import org.optaplanner.examples.cloudbalancing.optional.domain.CloudProcessDifficultyComparator;
 import org.optaplanner.examples.common.domain.AbstractPersistable;
 
 @PlanningEntity(difficultyComparatorClass = CloudProcessDifficultyComparator.class)
@@ -33,6 +33,16 @@ public class CloudProcess extends AbstractPersistable {
 
     // Planning variables: changes during planning, between score calculations.
     private CloudComputer computer;
+
+    public CloudProcess() {
+    }
+
+    public CloudProcess(long id, int requiredCpuPower, int requiredMemory, int requiredNetworkBandwidth) {
+        super(id);
+        this.requiredCpuPower = requiredCpuPower;
+        this.requiredMemory = requiredMemory;
+        this.requiredNetworkBandwidth = requiredNetworkBandwidth;
+    }
 
     public int getRequiredCpuPower() {
         return requiredCpuPower;

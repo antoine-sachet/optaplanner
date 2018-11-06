@@ -54,8 +54,6 @@ import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
@@ -75,6 +73,7 @@ import org.optaplanner.benchmark.impl.result.ProblemBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.SingleBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.SolverBenchmarkResult;
 import org.optaplanner.benchmark.impl.statistic.common.MillisecondsSpentNumberFormat;
+import org.optaplanner.core.config.SolverConfigContext;
 import org.optaplanner.swing.impl.SwingUncaughtExceptionHandler;
 import org.optaplanner.swing.impl.SwingUtils;
 import org.slf4j.Logger;
@@ -204,23 +203,18 @@ public class BenchmarkAggregatorFrame extends JFrame {
 
     private CheckBoxTree createCheckBoxTree() {
         final CheckBoxTree resultCheckBoxTree = new CheckBoxTree(initBenchmarkHierarchy(true));
-        resultCheckBoxTree.addTreeSelectionListener(new TreeSelectionListener() {
-
-            @Override
-            public void valueChanged(TreeSelectionEvent e) {
-                TreePath treeSelectionPath = e.getNewLeadSelectionPath();
-                if (treeSelectionPath != null) {
-                    DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) treeSelectionPath.getLastPathComponent();
-                    MixedCheckBox checkBox = (MixedCheckBox) treeNode.getUserObject();
-                    detailTextArea.setText(checkBox.getDetail());
-                    detailTextArea.setCaretPosition(0);
-                    renameNodeButton.setEnabled(checkBox.getBenchmarkResult() instanceof PlannerBenchmarkResult
-                            || checkBox.getBenchmarkResult() instanceof SolverBenchmarkResult);
-                }
+        resultCheckBoxTree.addTreeSelectionListener(e -> {
+            TreePath treeSelectionPath = e.getNewLeadSelectionPath();
+            if (treeSelectionPath != null) {
+                DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) treeSelectionPath.getLastPathComponent();
+                MixedCheckBox checkBox = (MixedCheckBox) treeNode.getUserObject();
+                detailTextArea.setText(checkBox.getDetail());
+                detailTextArea.setCaretPosition(0);
+                renameNodeButton.setEnabled(checkBox.getBenchmarkResult() instanceof PlannerBenchmarkResult
+                        || checkBox.getBenchmarkResult() instanceof SolverBenchmarkResult);
             }
         });
         resultCheckBoxTree.addMouseListener(new MouseAdapter() {
-
             @Override
             public void mousePressed(MouseEvent e) {
                 // Enable button if checked singleBenchmarkResults exist
@@ -232,7 +226,8 @@ public class BenchmarkAggregatorFrame extends JFrame {
     }
 
     private void initPlannerBenchmarkResultList() {
-        plannerBenchmarkResultList = benchmarkResultIO.readPlannerBenchmarkResultList(
+        SolverConfigContext configContext = new SolverConfigContext();
+        plannerBenchmarkResultList = benchmarkResultIO.readPlannerBenchmarkResultList(configContext,
                 benchmarkAggregator.getBenchmarkDirectory());
         for (PlannerBenchmarkResult plannerBenchmarkResult : plannerBenchmarkResultList) {
             plannerBenchmarkResult.accumulateResults(
@@ -598,7 +593,7 @@ public class BenchmarkAggregatorFrame extends JFrame {
                         desktop.browse(reportFile.getAbsoluteFile().toURI());
                     } catch (IOException e) {
                         throw new IllegalStateException("Failed showing reportFile (" + reportFile
-                                + ") in browser.", e);
+                                + ") in the default browser.", e);
                     }
                     finishDialog();
                 }
@@ -613,7 +608,7 @@ public class BenchmarkAggregatorFrame extends JFrame {
                         desktop.open(reportFile.getParentFile());
                     } catch (IOException e) {
                         throw new IllegalStateException("Failed showing reportFile (" + reportFile
-                                + ") in file explorer.", e);
+                                + ") in the file explorer.", e);
                     }
                     finishDialog();
                 }

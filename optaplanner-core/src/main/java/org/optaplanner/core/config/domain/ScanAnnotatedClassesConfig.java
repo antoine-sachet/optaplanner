@@ -18,7 +18,6 @@ package org.optaplanner.core.config.domain;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +31,7 @@ import org.optaplanner.core.config.SolverConfigContext;
 import org.optaplanner.core.config.util.ConfigUtils;
 import org.optaplanner.core.impl.domain.solution.AbstractSolution;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
+import org.optaplanner.core.impl.score.definition.ScoreDefinition;
 import org.reflections.Reflections;
 import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.FilterBuilder;
@@ -54,7 +54,7 @@ public class ScanAnnotatedClassesConfig extends AbstractConfig<ScanAnnotatedClas
     // Builder methods
     // ************************************************************************
 
-    public SolutionDescriptor buildSolutionDescriptor(SolverConfigContext configContext) {
+    public SolutionDescriptor buildSolutionDescriptor(SolverConfigContext configContext, ScoreDefinition deprecatedScoreDefinition) {
         ClassLoader[] classLoaders;
         if (configContext.getClassLoader() != null) {
             classLoaders = new ClassLoader[] {configContext.getClassLoader()};
@@ -84,7 +84,7 @@ public class ScanAnnotatedClassesConfig extends AbstractConfig<ScanAnnotatedClas
         Reflections reflections = new Reflections(builder);
         Class<?> solutionClass = loadSolutionClass(reflections);
         List<Class<?>> entityClassList = loadEntityClassList(reflections);
-        return SolutionDescriptor.buildSolutionDescriptor(solutionClass, entityClassList);
+        return SolutionDescriptor.buildSolutionDescriptor(solutionClass, entityClassList, deprecatedScoreDefinition);
     }
 
     protected Class<?> loadSolutionClass(Reflections reflections) {
@@ -129,12 +129,7 @@ public class ScanAnnotatedClassesConfig extends AbstractConfig<ScanAnnotatedClas
 
     // TODO We need unit test for this: annotation scanning with TestdataUnannotatedExtendedEntity
     private void retainOnlyClassesWithDeclaredAnnotation(Set<Class<?>> classSet, Class<? extends Annotation> annotation) {
-        for (Iterator<Class<?>> it = classSet.iterator(); it.hasNext(); ) {
-            Class<?> clazz = it.next();
-            if (!clazz.isAnnotationPresent(annotation)) {
-                it.remove();
-            }
-        }
+        classSet.removeIf(clazz -> !clazz.isAnnotationPresent(annotation));
     }
 
     @Override

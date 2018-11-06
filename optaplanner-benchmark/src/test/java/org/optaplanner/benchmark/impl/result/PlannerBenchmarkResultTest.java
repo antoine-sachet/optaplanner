@@ -23,8 +23,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.junit.Test;
-import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
-import org.optaplanner.benchmark.impl.statistic.PureSubSingleStatistic;
+import org.optaplanner.benchmark.impl.loader.FileProblemProvider;
 import org.optaplanner.core.api.score.buildin.simple.SimpleScore;
 import org.optaplanner.core.config.solver.SolverConfig;
 import org.optaplanner.core.config.solver.random.RandomType;
@@ -60,20 +59,20 @@ public class PlannerBenchmarkResultTest {
         p2SolverZ.setSingleBenchmarkResultList(new ArrayList<>());
 
         ProblemBenchmarkResult p1ProblemA = new ProblemBenchmarkResult(p1);
-        p1ProblemA.setInputSolutionFile(new File("problemA.xml"));
-        p1ProblemA.setProblemStatisticList(Collections.<ProblemStatistic>emptyList());
-        p1ProblemA.setSingleBenchmarkResultList(Collections.<SingleBenchmarkResult>emptyList());
-        p1ProblemA.setSingleBenchmarkResultList(new ArrayList<SingleBenchmarkResult>());
+        p1ProblemA.setProblemProvider(new FileProblemProvider(null, new File("problemA.xml")));
+        p1ProblemA.setProblemStatisticList(Collections.emptyList());
+        p1ProblemA.setSingleBenchmarkResultList(Collections.emptyList());
+        p1ProblemA.setSingleBenchmarkResultList(new ArrayList<>());
         ProblemBenchmarkResult p1ProblemB = new ProblemBenchmarkResult(p1);
-        p1ProblemB.setInputSolutionFile(new File("problemB.xml"));
-        p1ProblemB.setProblemStatisticList(Collections.<ProblemStatistic>emptyList());
-        p1ProblemB.setSingleBenchmarkResultList(Collections.<SingleBenchmarkResult>emptyList());
-        p1ProblemB.setSingleBenchmarkResultList(new ArrayList<SingleBenchmarkResult>());
+        p1ProblemB.setProblemProvider(new FileProblemProvider(null, new File("problemB.xml")));
+        p1ProblemB.setProblemStatisticList(Collections.emptyList());
+        p1ProblemB.setSingleBenchmarkResultList(Collections.emptyList());
+        p1ProblemB.setSingleBenchmarkResultList(new ArrayList<>());
         ProblemBenchmarkResult p2ProblemA = new ProblemBenchmarkResult(p2);
-        p2ProblemA.setInputSolutionFile(new File("problemA.xml"));
-        p2ProblemA.setProblemStatisticList(Collections.<ProblemStatistic>emptyList());
-        p2ProblemA.setSingleBenchmarkResultList(Collections.<SingleBenchmarkResult>emptyList());
-        p2ProblemA.setSingleBenchmarkResultList(new ArrayList<SingleBenchmarkResult>());
+        p2ProblemA.setProblemProvider(new FileProblemProvider(null, new File("problemA.xml")));
+        p2ProblemA.setProblemStatisticList(Collections.emptyList());
+        p2ProblemA.setSingleBenchmarkResultList(Collections.emptyList());
+        p2ProblemA.setSingleBenchmarkResultList(new ArrayList<>());
 
         SingleBenchmarkResult p1SolverXProblemA = createSingleBenchmarkResult(p1SolverX, p1ProblemA, -1);
         createSubSingleBenchmarkResult(p1SolverXProblemA, 1);
@@ -93,8 +92,8 @@ public class PlannerBenchmarkResultTest {
         assertEquals("Solver Y", mergedSolverBenchmarkResultList.get(1).getName());
         assertEquals("Solver Z", mergedSolverBenchmarkResultList.get(2).getName());
         assertEquals(2, mergedProblemBenchmarkResultList.size());
-        assertEquals("problemA.xml", mergedProblemBenchmarkResultList.get(0).getInputSolutionFile().getName());
-        assertEquals("problemB.xml", mergedProblemBenchmarkResultList.get(1).getInputSolutionFile().getName());
+        assertEquals("problemA", mergedProblemBenchmarkResultList.get(0).getProblemProvider().getProblemName());
+        assertEquals("problemB", mergedProblemBenchmarkResultList.get(1).getProblemProvider().getProblemName());
     }
 
     protected SingleBenchmarkResult createSingleBenchmarkResult(
@@ -102,7 +101,7 @@ public class PlannerBenchmarkResultTest {
         SingleBenchmarkResult singleBenchmarkResult = new SingleBenchmarkResult(solverBenchmarkResult, problemBenchmarkResult);
         solverBenchmarkResult.getSingleBenchmarkResultList().add(singleBenchmarkResult);
         problemBenchmarkResult.getSingleBenchmarkResultList().add(singleBenchmarkResult);
-        singleBenchmarkResult.setAverageScore(SimpleScore.valueOfInitialized(score));
+        singleBenchmarkResult.setAverageAndTotalScoreForTesting(SimpleScore.of(score));
         singleBenchmarkResult.setSubSingleBenchmarkResultList(new ArrayList<>(1));
         createSubSingleBenchmarkResult(singleBenchmarkResult, 0);
         return singleBenchmarkResult;
@@ -110,7 +109,7 @@ public class PlannerBenchmarkResultTest {
 
     protected SubSingleBenchmarkResult createSubSingleBenchmarkResult(SingleBenchmarkResult parent, int subSingleIndex) {
         SubSingleBenchmarkResult subSingleBenchmarkResult = new SubSingleBenchmarkResult(parent, subSingleIndex);
-        subSingleBenchmarkResult.setPureSubSingleStatisticList(Collections.<PureSubSingleStatistic>emptyList());
+        subSingleBenchmarkResult.setPureSubSingleStatisticList(Collections.emptyList());
         parent.getSubSingleBenchmarkResultList().add(subSingleBenchmarkResult);
         return subSingleBenchmarkResult;
     }

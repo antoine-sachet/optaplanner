@@ -23,12 +23,12 @@ import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.examples.nurserostering.domain.Employee;
+import org.optaplanner.examples.nurserostering.domain.NurseRoster;
 import org.optaplanner.examples.nurserostering.domain.ShiftAssignment;
 
-public class EmployeeChangeMove extends AbstractMove {
+public class EmployeeChangeMove extends AbstractMove<NurseRoster> {
 
     private ShiftAssignment shiftAssignment;
     private Employee toEmployee;
@@ -39,18 +39,24 @@ public class EmployeeChangeMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<NurseRoster> scoreDirector) {
         return !Objects.equals(shiftAssignment.getEmployee(), toEmployee);
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public EmployeeChangeMove createUndoMove(ScoreDirector<NurseRoster> scoreDirector) {
         return new EmployeeChangeMove(shiftAssignment, shiftAssignment.getEmployee());
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<NurseRoster> scoreDirector) {
         NurseRosteringMoveHelper.moveEmployee(scoreDirector, shiftAssignment, toEmployee);
+    }
+
+    @Override
+    public EmployeeChangeMove rebase(ScoreDirector<NurseRoster> destinationScoreDirector) {
+        return new EmployeeChangeMove(destinationScoreDirector.lookUpWorkingObject(shiftAssignment),
+                destinationScoreDirector.lookUpWorkingObject(toEmployee));
     }
 
     @Override
@@ -63,6 +69,7 @@ public class EmployeeChangeMove extends AbstractMove {
         return Collections.singletonList(toEmployee);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -77,6 +84,7 @@ public class EmployeeChangeMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(shiftAssignment)
@@ -84,6 +92,7 @@ public class EmployeeChangeMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         return shiftAssignment + " {" + shiftAssignment.getEmployee() + " -> " + toEmployee + "}";
     }

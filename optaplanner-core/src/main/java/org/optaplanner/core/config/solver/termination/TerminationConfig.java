@@ -31,12 +31,13 @@ import org.optaplanner.core.impl.solver.termination.AbstractCompositeTermination
 import org.optaplanner.core.impl.solver.termination.AndCompositeTermination;
 import org.optaplanner.core.impl.solver.termination.BestScoreFeasibleTermination;
 import org.optaplanner.core.impl.solver.termination.BestScoreTermination;
-import org.optaplanner.core.impl.solver.termination.ScoreCalculationCountTermination;
 import org.optaplanner.core.impl.solver.termination.OrCompositeTermination;
+import org.optaplanner.core.impl.solver.termination.ScoreCalculationCountTermination;
 import org.optaplanner.core.impl.solver.termination.StepCountTermination;
 import org.optaplanner.core.impl.solver.termination.Termination;
 import org.optaplanner.core.impl.solver.termination.TimeMillisSpentTermination;
 import org.optaplanner.core.impl.solver.termination.UnimprovedStepCountTermination;
+import org.optaplanner.core.impl.solver.termination.UnimprovedTimeMillisSpentScoreDifferenceThresholdTermination;
 import org.optaplanner.core.impl.solver.termination.UnimprovedTimeMillisSpentTermination;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,11 +56,13 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
     private Long minutesSpentLimit = null;
     private Long hoursSpentLimit = null;
     private Long daysSpentLimit = null;
+
     private Long unimprovedMillisecondsSpentLimit = null;
     private Long unimprovedSecondsSpentLimit = null;
     private Long unimprovedMinutesSpentLimit = null;
     private Long unimprovedHoursSpentLimit = null;
     private Long unimprovedDaysSpentLimit = null;
+    private String unimprovedScoreDifferenceThreshold = null;
 
     private String bestScoreLimit = null;
     private Boolean bestScoreFeasible = null;
@@ -68,7 +71,7 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
     private Integer unimprovedStepCountLimit = null;
 
     /**
-     * @deprecated Use {@link #scoreCalculationCountLimit} instead.
+     * @deprecated Use {@link #scoreCalculationCountLimit} instead. Will be removed in 8.0.
      */
     @Deprecated
     private Long calculateCountLimit = null;
@@ -173,6 +176,14 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
         this.unimprovedDaysSpentLimit = unimprovedDaysSpentLimit;
     }
 
+    public String getUnimprovedScoreDifferenceThreshold() {
+        return unimprovedScoreDifferenceThreshold;
+    }
+
+    public void setUnimprovedScoreDifferenceThreshold(String unimprovedScoreDifferenceThreshold) {
+        this.unimprovedScoreDifferenceThreshold = unimprovedScoreDifferenceThreshold;
+    }
+
     public String getBestScoreLimit() {
         return bestScoreLimit;
     }
@@ -206,7 +217,7 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
     }
 
     /**
-     * @deprecated Use {@link #getScoreCalculationCountLimit()} instead.
+     * @deprecated Use {@link #getScoreCalculationCountLimit()} instead. Will be removed in 8.0.
      */
     @Deprecated
     public Long getCalculateCountLimit() {
@@ -214,7 +225,7 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
     }
 
     /**
-     * @deprecated Use {@link #setScoreCalculationCountLimit(Long)} instead.
+     * @deprecated Use {@link #setScoreCalculationCountLimit(Long)} instead. Will be removed in 8.0.
      */
     @Deprecated
     public void setCalculateCountLimit(Long calculateCountLimit) {
@@ -235,6 +246,105 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
 
     public void setTerminationConfigList(List<TerminationConfig> terminationConfigList) {
         this.terminationConfigList = terminationConfigList;
+    }
+
+    // ************************************************************************
+    // With methods
+    // ************************************************************************
+
+    public TerminationConfig withTerminationClass(Class<? extends Termination> terminationClass) {
+        this.terminationClass = terminationClass;
+        return this;
+    }
+
+    public TerminationConfig withTerminationCompositionStyle(TerminationCompositionStyle terminationCompositionStyle) {
+        this.terminationCompositionStyle = terminationCompositionStyle;
+        return this;
+    }
+
+    public TerminationConfig withMillisecondsSpentLimit(Long millisecondsSpentLimit) {
+        this.millisecondsSpentLimit = millisecondsSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withSecondsSpentLimit(Long secondsSpentLimit) {
+        this.secondsSpentLimit = secondsSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withMinutesSpentLimit(Long minutesSpentLimit) {
+        this.minutesSpentLimit = minutesSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withHoursSpentLimit(Long hoursSpentLimit) {
+        this.hoursSpentLimit = hoursSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withDaysSpentLimit(Long daysSpentLimit) {
+        this.daysSpentLimit = daysSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedMillisecondsSpentLimit(Long unimprovedMillisecondsSpentLimit) {
+        this.unimprovedMillisecondsSpentLimit = unimprovedMillisecondsSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedSecondsSpentLimit(Long unimprovedSecondsSpentLimit) {
+        this.unimprovedSecondsSpentLimit = unimprovedSecondsSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedMinutesSpentLimit(Long unimprovedMinutesSpentLimit) {
+        this.unimprovedMinutesSpentLimit = unimprovedMinutesSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedHoursSpentLimit(Long unimprovedHoursSpentLimit) {
+        this.unimprovedHoursSpentLimit = unimprovedHoursSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedDaysSpentLimit(Long unimprovedDaysSpentLimit) {
+        this.unimprovedDaysSpentLimit = unimprovedDaysSpentLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedScoreDifferenceThreshold(String unimprovedScoreDifferenceThreshold) {
+        this.unimprovedScoreDifferenceThreshold = unimprovedScoreDifferenceThreshold;
+        return this;
+    }
+
+    public TerminationConfig withBestScoreLimit(String bestScoreLimit) {
+        this.bestScoreLimit = bestScoreLimit;
+        return this;
+    }
+
+    public TerminationConfig withBestScoreFeasible(Boolean bestScoreFeasible) {
+        this.bestScoreFeasible = bestScoreFeasible;
+        return this;
+    }
+
+    public TerminationConfig withStepCountLimit(Integer stepCountLimit) {
+        this.stepCountLimit = stepCountLimit;
+        return this;
+    }
+
+    public TerminationConfig withUnimprovedStepCountLimit(Integer unimprovedStepCountLimit) {
+        this.unimprovedStepCountLimit = unimprovedStepCountLimit;
+        return this;
+    }
+
+    public TerminationConfig withScoreCalculationCountLimit(Long scoreCalculationCountLimit) {
+        this.scoreCalculationCountLimit = scoreCalculationCountLimit;
+        return this;
+    }
+
+    public TerminationConfig withTerminationConfigList(List<TerminationConfig> terminationConfigList) {
+        this.terminationConfigList = terminationConfigList;
+        return this;
     }
 
     // ************************************************************************
@@ -265,11 +375,26 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
         }
         Long unimprovedTimeMillisSpentLimit = calculateUnimprovedTimeMillisSpentLimit();
         if (unimprovedTimeMillisSpentLimit != null) {
-            terminationList.add(new UnimprovedTimeMillisSpentTermination(unimprovedTimeMillisSpentLimit));
+            if (unimprovedScoreDifferenceThreshold == null) {
+                terminationList.add(new UnimprovedTimeMillisSpentTermination(unimprovedTimeMillisSpentLimit));
+            } else {
+                ScoreDefinition scoreDefinition = configPolicy.getScoreDefinition();
+                Score unimprovedScoreDifferenceThreshold_ = scoreDefinition.parseScore(unimprovedScoreDifferenceThreshold);
+                if (unimprovedScoreDifferenceThreshold_.compareTo(scoreDefinition.getZeroScore()) <= 0) {
+                    throw new IllegalStateException("The unimprovedScoreDifferenceThreshold ("
+                            + unimprovedScoreDifferenceThreshold + ") must be positive.");
+
+                }
+                terminationList.add(new UnimprovedTimeMillisSpentScoreDifferenceThresholdTermination(unimprovedTimeMillisSpentLimit, unimprovedScoreDifferenceThreshold_));
+            }
+        } else if (unimprovedScoreDifferenceThreshold != null) {
+            throw new IllegalStateException("The unimprovedScoreDifferenceThreshold ("
+                    + unimprovedScoreDifferenceThreshold + ") can only be used if an unimproved*SpentLimit ("
+                    + unimprovedTimeMillisSpentLimit + ") is used too.");
         }
         if (bestScoreLimit != null) {
-            Score bestScoreLimit_ = configPolicy.getScoreDefinition().parseScore(bestScoreLimit);
             ScoreDefinition scoreDefinition = configPolicy.getScoreDefinition();
+            Score bestScoreLimit_ = scoreDefinition.parseScore(bestScoreLimit);
             double[] timeGradientWeightNumbers = new double[scoreDefinition.getLevelsSize() - 1];
             for (int i = 0; i < timeGradientWeightNumbers.length; i++) {
                 timeGradientWeightNumbers[i] = 0.50; // Number pulled out of thin air
@@ -358,28 +483,28 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
                 throw new IllegalArgumentException("The termination secondsSpentLimit (" + secondsSpentLimit
                         + ") cannot be negative.");
             }
-            timeMillisSpentLimit += secondsSpentLimit * 1000L;
+            timeMillisSpentLimit += secondsSpentLimit * 1_000L;
         }
         if (minutesSpentLimit != null) {
             if (minutesSpentLimit < 0L) {
                 throw new IllegalArgumentException("The termination minutesSpentLimit (" + minutesSpentLimit
                         + ") cannot be negative.");
             }
-            timeMillisSpentLimit += minutesSpentLimit * 60000L;
+            timeMillisSpentLimit += minutesSpentLimit * 60_000L;
         }
         if (hoursSpentLimit != null) {
             if (hoursSpentLimit < 0L) {
                 throw new IllegalArgumentException("The termination hoursSpentLimit (" + hoursSpentLimit
                         + ") cannot be negative.");
             }
-            timeMillisSpentLimit += hoursSpentLimit * 3600000L;
+            timeMillisSpentLimit += hoursSpentLimit * 3_600_000L;
         }
         if (daysSpentLimit != null) {
             if (daysSpentLimit < 0L) {
                 throw new IllegalArgumentException("The termination daysSpentLimit (" + daysSpentLimit
                         + ") cannot be negative.");
             }
-            timeMillisSpentLimit += daysSpentLimit * 86400000L;
+            timeMillisSpentLimit += daysSpentLimit * 86_400_000L;
         }
         return timeMillisSpentLimit;
     }
@@ -465,6 +590,8 @@ public class TerminationConfig extends AbstractConfig<TerminationConfig> {
                 inheritedConfig.getUnimprovedHoursSpentLimit());
         unimprovedDaysSpentLimit = ConfigUtils.inheritOverwritableProperty(unimprovedDaysSpentLimit,
                 inheritedConfig.getUnimprovedDaysSpentLimit());
+        unimprovedScoreDifferenceThreshold = ConfigUtils.inheritOverwritableProperty(unimprovedScoreDifferenceThreshold,
+                inheritedConfig.getUnimprovedScoreDifferenceThreshold());
         bestScoreLimit = ConfigUtils.inheritOverwritableProperty(bestScoreLimit,
                 inheritedConfig.getBestScoreLimit());
         bestScoreFeasible = ConfigUtils.inheritOverwritableProperty(bestScoreFeasible,

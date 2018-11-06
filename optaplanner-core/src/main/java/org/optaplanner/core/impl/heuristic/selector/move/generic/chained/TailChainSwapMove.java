@@ -18,6 +18,7 @@ package org.optaplanner.core.impl.heuristic.selector.move.generic.chained;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -29,30 +30,137 @@ import org.optaplanner.core.impl.domain.variable.anchor.AnchorVariableSupply;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
 import org.optaplanner.core.impl.domain.variable.inverserelation.SingletonInverseVariableSupply;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 
 /**
  * Also known as a 2-opt move.
  * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
  */
-public class TailChainSwapMove<Solution_> extends AbstractMove {
+public class TailChainSwapMove<Solution_> extends AbstractMove<Solution_> {
 
     protected final GenuineVariableDescriptor<Solution_> variableDescriptor;
-    protected final SingletonInverseVariableSupply inverseVariableSupply;
-    protected final AnchorVariableSupply anchorVariableSupply;
 
     protected final Object leftEntity;
+    protected final Object leftValue;
+    protected final Object leftAnchor;
+
+    protected final Object rightEntity; // Sometimes null
     protected final Object rightValue;
+    protected final Object rightAnchor;
+
+    protected final boolean sameAnchor;
+    protected final Object leftNextEntity;
+    protected final Object rightNextEntity;
+    protected final boolean reverseAnchorSide;
+    protected final Object lastEntityInChain;
+    protected final Object entityAfterAnchor;
 
     public TailChainSwapMove(GenuineVariableDescriptor<Solution_> variableDescriptor,
             SingletonInverseVariableSupply inverseVariableSupply, AnchorVariableSupply anchorVariableSupply,
             Object leftEntity, Object rightValue) {
         this.variableDescriptor = variableDescriptor;
-        this.inverseVariableSupply = inverseVariableSupply;
-        this.anchorVariableSupply = anchorVariableSupply;
         this.leftEntity = leftEntity;
+        leftValue = variableDescriptor.getValue(leftEntity);
+        leftAnchor = anchorVariableSupply.getAnchor(leftEntity);
+        rightEntity = inverseVariableSupply.getInverseSingleton(rightValue);
         this.rightValue = rightValue;
+        rightAnchor = variableDescriptor.isValuePotentialAnchor(rightValue) ? rightValue
+                : anchorVariableSupply.getAnchor(rightValue);
+        sameAnchor = leftAnchor == rightAnchor;
+        if (!sameAnchor) {
+            leftNextEntity = null;
+            rightNextEntity = null;
+            reverseAnchorSide = false;
+            lastEntityInChain = null;
+            entityAfterAnchor = null;
+        } else {
+            leftNextEntity = inverseVariableSupply.getInverseSingleton(leftEntity);
+            rightNextEntity = rightEntity == null ? null : inverseVariableSupply.getInverseSingleton(rightEntity);
+            Object lastEntityInChainOrLeftEntity = findLastEntityInChainOrLeftEntity(inverseVariableSupply);
+            reverseAnchorSide = lastEntityInChainOrLeftEntity != leftEntity;
+            if (reverseAnchorSide) {
+                lastEntityInChain = lastEntityInChainOrLeftEntity;
+                entityAfterAnchor = inverseVariableSupply.getInverseSingleton(leftAnchor);
+            } else {
+                lastEntityInChain = null;
+                entityAfterAnchor = null;
+            }
+        }
+    }
+
+    // TODO Workaround until https://issues.jboss.org/browse/PLANNER-1250 is fixed
+    protected TailChainSwapMove(GenuineVariableDescriptor<Solution_> variableDescriptor,
+            Object leftEntity, Object leftValue, Object leftAnchor,
+            Object rightEntity, Object rightValue, Object rightAnchor) {
+        this.variableDescriptor = variableDescriptor;
+        this.leftEntity = leftEntity;
+        this.leftValue = leftValue;
+        this.leftAnchor = leftAnchor;
+        this.rightEntity = rightEntity;
+        this.rightValue = rightValue;
+        this.rightAnchor = rightAnchor;
+        this.sameAnchor = false;
+        this.leftNextEntity = null;
+        this.rightNextEntity = null;
+        this.reverseAnchorSide = false;
+        this.lastEntityInChain = null;
+        this.entityAfterAnchor = null;
+    }
+
+    // TODO Workaround until https://issues.jboss.org/browse/PLANNER-1250 is fixed
+    protected TailChainSwapMove(GenuineVariableDescriptor<Solution_> variableDescriptor,
+            Object leftEntity, Object leftValue, Object leftAnchor,
+            Object rightEntity, Object rightValue, Object rightAnchor,
+            Object leftNextEntity, Object rightNextEntity) {
+        this.variableDescriptor = variableDescriptor;
+        this.leftEntity = leftEntity;
+        this.leftValue = leftValue;
+        this.leftAnchor = leftAnchor;
+        this.rightEntity = rightEntity;
+        this.rightValue = rightValue;
+        this.rightAnchor = rightAnchor;
+        this.sameAnchor = true;
+        this.leftNextEntity = leftNextEntity;
+        this.rightNextEntity = rightNextEntity;
+        this.reverseAnchorSide = false;
+        this.lastEntityInChain = null;
+        this.entityAfterAnchor = null;
+    }
+
+    // TODO Workaround until https://issues.jboss.org/browse/PLANNER-1250 is fixed
+    protected TailChainSwapMove(GenuineVariableDescriptor<Solution_> variableDescriptor,
+            Object leftEntity, Object leftValue, Object leftAnchor,
+            Object rightEntity, Object rightValue, Object rightAnchor,
+            Object leftNextEntity, Object rightNextEntity, Object lastEntityInChain, Object entityAfterAnchor) {
+        this.variableDescriptor = variableDescriptor;
+        this.leftEntity = leftEntity;
+        this.leftValue = leftValue;
+        this.leftAnchor = leftAnchor;
+        this.rightEntity = rightEntity;
+        this.rightValue = rightValue;
+        this.rightAnchor = rightAnchor;
+        this.sameAnchor = true;
+        this.leftNextEntity = leftNextEntity;
+        this.rightNextEntity = rightNextEntity;
+        this.reverseAnchorSide = true;
+        this.lastEntityInChain = lastEntityInChain;
+        this.entityAfterAnchor = entityAfterAnchor;
+    }
+
+    private Object findLastEntityInChainOrLeftEntity(SingletonInverseVariableSupply inverseVariableSupply) {
+        Object entity = rightValue;
+        while (entity != leftEntity) {
+            Object nextEntity = inverseVariableSupply.getInverseSingleton(entity);
+            if (nextEntity == null) {
+                return entity;
+            }
+            entity = nextEntity;
+        }
+        return leftEntity;
+    }
+
+    public String getVariableName() {
+        return variableDescriptor.getVariableName();
     }
 
     public Object getLeftEntity() {
@@ -67,22 +175,13 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
     // Worker methods
     // ************************************************************************
 
-    protected Object determineRightAnchor() {
-        return variableDescriptor.isValuePotentialAnchor(rightValue) ? rightValue
-                : anchorVariableSupply.getAnchor(rightValue);
-    }
-
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
-        Object leftValue = variableDescriptor.getValue(leftEntity);
-        Object rightEntity = inverseVariableSupply.getInverseSingleton(rightValue);
+    public boolean isMoveDoable(ScoreDirector<Solution_> scoreDirector) {
         if (Objects.equals(leftValue, rightValue)
                 || Objects.equals(leftEntity, rightValue) || Objects.equals(rightEntity, leftValue)) {
             return false;
         }
         if (rightEntity == null) {
-            Object leftAnchor = anchorVariableSupply.getAnchor(leftEntity);
-            Object rightAnchor = determineRightAnchor();
             // TODO Currently unsupported because we fail to create a valid undoMove... even though doMove supports it
             if (leftAnchor == rightAnchor) {
                 return false;
@@ -90,8 +189,7 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
         }
         if (!variableDescriptor.isValueRangeEntityIndependent()) {
             ValueRangeDescriptor<Solution_> valueRangeDescriptor = variableDescriptor.getValueRangeDescriptor();
-            // type cast in order to avoid having to make Move and all its sub-types generic
-            Solution_ workingSolution = (Solution_) scoreDirector.getWorkingSolution();
+            Solution_ workingSolution = scoreDirector.getWorkingSolution();
             if (rightEntity != null) {
                 ValueRange rightValueRange = valueRangeDescriptor.extractValueRange(workingSolution, rightEntity);
                 if (!rightValueRange.contains(leftValue)) {
@@ -107,32 +205,34 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
-        Object leftAnchor = anchorVariableSupply.getAnchor(leftEntity);
-        Object rightAnchor = determineRightAnchor();
-        Object leftValue = variableDescriptor.getValue(leftEntity);
-        if (leftAnchor != rightAnchor) {
-            return new TailChainSwapMove<>(variableDescriptor, inverseVariableSupply, anchorVariableSupply, leftEntity,
-                    leftValue);
+    public TailChainSwapMove<Solution_> createUndoMove(ScoreDirector<Solution_> scoreDirector) {
+        if (!sameAnchor) {
+            return new TailChainSwapMove<>(variableDescriptor,
+                    leftEntity, rightValue, rightAnchor,
+                    rightEntity, leftValue, leftAnchor);
         } else {
-            Object rightEntity = inverseVariableSupply.getInverseSingleton(rightValue);
-            if (rightEntity != null) {
-                return new TailChainSwapMove<>(variableDescriptor, inverseVariableSupply, anchorVariableSupply,
-                        rightEntity, rightValue);
-            } else {
+            if (rightEntity == null) {
                 // TODO Currently unsupported because we fail to create a valid undoMove... even though doMove supports it
+                // https://issues.jboss.org/browse/PLANNER-1250
                 throw new IllegalStateException("Impossible state, because isMoveDoable() should not return true.");
+            }
+            if (!reverseAnchorSide) {
+                return new TailChainSwapMove<>(variableDescriptor,
+                        rightEntity, rightNextEntity, leftAnchor,
+                        leftEntity, rightValue, rightAnchor,
+                        leftNextEntity, leftValue);
+            } else {
+                return new TailChainSwapMove<>(variableDescriptor,
+                        rightEntity, rightNextEntity, leftAnchor,
+                        leftEntity, rightValue, rightAnchor,
+                        leftNextEntity, leftValue, entityAfterAnchor, lastEntityInChain);
             }
         }
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
-        Object leftAnchor = anchorVariableSupply.getAnchor(leftEntity);
-        Object rightAnchor = determineRightAnchor();
-        Object leftValue = variableDescriptor.getValue(leftEntity);
-        Object rightEntity = inverseVariableSupply.getInverseSingleton(rightValue); // Sometimes null
-        if (leftAnchor != rightAnchor) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<Solution_> scoreDirector) {
+        if (!sameAnchor) {
             // Change the left entity
             scoreDirector.changeVariableFacade(variableDescriptor, leftEntity, rightValue);
             // Change the right entity
@@ -140,10 +240,8 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
                 scoreDirector.changeVariableFacade(variableDescriptor, rightEntity, leftValue);
             }
         } else {
-            Object lastEntityInChainOrLeftEntity = findLastEntityInChainOrLeftEntity();
-            if (lastEntityInChainOrLeftEntity == leftEntity) {
+            if (!reverseAnchorSide) {
                 // Reverses loop on the side that doesn't include the anchor, because rightValue is earlier than leftEntity
-                Object leftNextEntity = inverseVariableSupply.getInverseSingleton(leftEntity);
                 scoreDirector.changeVariableFacade(variableDescriptor, leftEntity, rightValue);
                 reverseChain(scoreDirector, leftValue, leftEntity, rightEntity);
                 if (leftNextEntity != null) {
@@ -151,9 +249,6 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
                 }
             } else {
                 // Reverses loop on the side that does include the anchor, because rightValue is later than leftEntity
-                Object lastEntityInChain = lastEntityInChainOrLeftEntity;
-                Object leftNextEntity = inverseVariableSupply.getInverseSingleton(leftEntity);
-                Object entityAfterAnchor = inverseVariableSupply.getInverseSingleton(leftAnchor);
                 // Change the head of the chain
                 reverseChain(scoreDirector, leftValue, leftEntity, entityAfterAnchor);
                 // Change leftEntity
@@ -165,18 +260,6 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
         }
     }
 
-    protected Object findLastEntityInChainOrLeftEntity() {
-        Object entity = rightValue;
-        while (entity != leftEntity) {
-            Object nextEntity = inverseVariableSupply.getInverseSingleton(entity);
-            if (nextEntity == null) {
-                return entity;
-            }
-            entity = nextEntity;
-        }
-        return leftEntity;
-    }
-
     protected void reverseChain(ScoreDirector scoreDirector, Object fromValue, Object fromEntity, Object toEntity) {
         Object entity = fromValue;
         Object newValue = fromEntity;
@@ -185,6 +268,43 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
             scoreDirector.changeVariableFacade(variableDescriptor, entity, newValue);
             newValue = entity;
             entity = oldValue;
+        }
+    }
+
+    @Override
+    public TailChainSwapMove<Solution_> rebase(ScoreDirector<Solution_> destinationScoreDirector) {
+        if (!sameAnchor) {
+            return new TailChainSwapMove<>(variableDescriptor,
+                    destinationScoreDirector.lookUpWorkingObject(leftEntity),
+                    destinationScoreDirector.lookUpWorkingObject(leftValue),
+                    destinationScoreDirector.lookUpWorkingObject(leftAnchor),
+                    destinationScoreDirector.lookUpWorkingObject(rightEntity),
+                    destinationScoreDirector.lookUpWorkingObject(rightValue),
+                    destinationScoreDirector.lookUpWorkingObject(rightAnchor));
+        } else {
+            if (!reverseAnchorSide) {
+                return new TailChainSwapMove<>(variableDescriptor,
+                        destinationScoreDirector.lookUpWorkingObject(leftEntity),
+                        destinationScoreDirector.lookUpWorkingObject(leftValue),
+                        destinationScoreDirector.lookUpWorkingObject(leftAnchor),
+                        destinationScoreDirector.lookUpWorkingObject(rightEntity),
+                        destinationScoreDirector.lookUpWorkingObject(rightValue),
+                        destinationScoreDirector.lookUpWorkingObject(rightAnchor),
+                        destinationScoreDirector.lookUpWorkingObject(leftNextEntity),
+                        destinationScoreDirector.lookUpWorkingObject(rightNextEntity));
+            } else {
+                return new TailChainSwapMove<>(variableDescriptor,
+                        destinationScoreDirector.lookUpWorkingObject(leftEntity),
+                        destinationScoreDirector.lookUpWorkingObject(leftValue),
+                        destinationScoreDirector.lookUpWorkingObject(leftAnchor),
+                        destinationScoreDirector.lookUpWorkingObject(rightEntity),
+                        destinationScoreDirector.lookUpWorkingObject(rightValue),
+                        destinationScoreDirector.lookUpWorkingObject(rightAnchor),
+                        destinationScoreDirector.lookUpWorkingObject(leftNextEntity),
+                        destinationScoreDirector.lookUpWorkingObject(rightNextEntity),
+                        destinationScoreDirector.lookUpWorkingObject(lastEntityInChain),
+                        destinationScoreDirector.lookUpWorkingObject(entityAfterAnchor));
+            }
         }
     }
 
@@ -199,7 +319,9 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
 
     @Override
     public Collection<? extends Object> getPlanningEntities() {
-        Object rightEntity = inverseVariableSupply.getInverseSingleton(rightValue);
+        if (rightEntity == null) {
+            return Collections.singleton(leftEntity);
+        }
         return Arrays.asList(leftEntity, rightEntity);
     }
 
@@ -209,11 +331,12 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
         return Arrays.asList(leftValue, rightValue);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         } else if (o instanceof TailChainSwapMove) {
-            TailChainSwapMove other = (TailChainSwapMove) o;
+            TailChainSwapMove<?> other = (TailChainSwapMove) o;
             return new EqualsBuilder()
                     .append(leftEntity, other.leftEntity)
                     .append(rightValue, other.rightValue)
@@ -223,6 +346,7 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(leftEntity)
@@ -230,9 +354,8 @@ public class TailChainSwapMove<Solution_> extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
-        Object leftValue = variableDescriptor.getValue(leftEntity);
-        Object rightEntity = inverseVariableSupply.getInverseSingleton(rightValue);
         return leftEntity + " {" + leftValue + "} <-tailChainSwap-> " + rightEntity + " {" + rightValue + "}";
     }
 

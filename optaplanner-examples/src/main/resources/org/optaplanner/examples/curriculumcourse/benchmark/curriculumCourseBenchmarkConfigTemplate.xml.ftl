@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/curriculumcourse/template</benchmarkDirectory>
   <parallelBenchmarkCount>AUTO</parallelBenchmarkCount>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -21,18 +20,16 @@
       <inputSolutionFile>data/curriculumcourse/unsolved/comp12.xml</inputSolutionFile>
       <inputSolutionFile>data/curriculumcourse/unsolved/comp13.xml</inputSolutionFile>
       <inputSolutionFile>data/curriculumcourse/unsolved/comp14.xml</inputSolutionFile>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
     </problemBenchmarks>
 
     <solver>
       <solutionClass>org.optaplanner.examples.curriculumcourse.domain.CourseSchedule</solutionClass>
       <entityClass>org.optaplanner.examples.curriculumcourse.domain.Lecture</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/curriculumcourse/solver/curriculumCourseScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <termination>
-        <secondsSpentLimit>300</secondsSpentLimit>
+          <minutesSpentLimit>5</minutesSpentLimit>
       </termination>
       <constructionHeuristic>
         <constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>

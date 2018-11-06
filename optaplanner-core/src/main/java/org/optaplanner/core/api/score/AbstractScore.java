@@ -18,14 +18,15 @@ package org.optaplanner.core.api.score;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.function.Predicate;
 
-import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 
 /**
  * Abstract superclass for {@link Score}.
  * <p>
  * Subclasses must be immutable.
+ * @param <S> the actual score type
  * @see Score
  * @see HardSoftScore
  */
@@ -88,6 +89,9 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
 
     protected static int parseLevelAsInt(Class<? extends Score> scoreClass,
             String scoreString, String levelString) {
+        if (levelString.equals("*")) {
+            return Integer.MIN_VALUE;
+        }
         try {
             return Integer.parseInt(levelString);
         } catch (NumberFormatException e) {
@@ -99,6 +103,9 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
 
     protected static long parseLevelAsLong(Class<? extends Score> scoreClass,
             String scoreString, String levelString) {
+        if (levelString.equals("*")) {
+            return Long.MIN_VALUE;
+        }
         try {
             return Long.parseLong(levelString);
         } catch (NumberFormatException e) {
@@ -110,6 +117,9 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
 
     protected static double parseLevelAsDouble(Class<? extends Score> scoreClass,
             String scoreString, String levelString) {
+        if (levelString.equals("*")) {
+            return Double.MIN_VALUE;
+        }
         try {
             return Double.parseDouble(levelString);
         } catch (NumberFormatException e) {
@@ -121,6 +131,13 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
 
     protected static BigDecimal parseLevelAsBigDecimal(Class<? extends Score> scoreClass,
             String scoreString, String levelString) {
+        if (levelString.equals("*")) {
+            throw new IllegalArgumentException("The scoreString (" + scoreString
+                    + ") for the scoreClass (" + scoreClass.getSimpleName()
+                    + ") has a wildcard (*) as levelString (" + levelString
+                    + ") which is not supported for BigDecimal score values," +
+                    " because there is no general MIN_VALUE for BigDecimal.");
+        }
         try {
             return new BigDecimal(levelString);
         } catch (NumberFormatException e) {
@@ -155,6 +172,9 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
 
     protected final int initScore;
 
+    /**
+     * @param initScore see {@link Score#getInitScore()}
+     */
     protected AbstractScore(int initScore) {
         this.initScore = initScore;
         // The initScore can be positive during statistical calculations.
@@ -174,9 +194,13 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
         return initScore >= 0;
     }
 
-    @Override
-    public boolean isCompatibleArithmeticArgument(Score otherScore) {
-        return getClass().isInstance(otherScore);
+    protected void assertNoInitScore() {
+        if (initScore != 0) {
+            throw new IllegalStateException("The score (" + this + ")'s initScore (" + initScore
+                    + ") should be 0.\n"
+                    + "Maybe the score calculator is calculating the initScore too,"
+                    + " although it's the score director's responsibility.");
+        }
     }
 
     protected String getInitPrefix() {
@@ -184,6 +208,28 @@ public abstract class AbstractScore<S extends Score> implements Score<S>, Serial
             return "";
         }
         return initScore + INIT_LABEL + "/";
+    }
+
+    protected String buildShortString(Predicate<Number> notZero, String... levelLabels) {
+        StringBuilder shortString = new StringBuilder();
+        if (initScore != 0) {
+            shortString.append(initScore).append(INIT_LABEL);
+        }
+        int i = 0;
+        for (Number levelNumber : toLevelNumbers()) {
+            if (notZero.test(levelNumber)) {
+                if (shortString.length() > 0) {
+                    shortString.append("/");
+                }
+                shortString.append(levelNumber).append(levelLabels[i]);
+            }
+            i++;
+        }
+        if (shortString.length() == 0) {
+            // Even for BigDecimals we use "0" over "0.0" because different levels can have different scales
+            return "0";
+        }
+        return shortString.toString();
     }
 
 }

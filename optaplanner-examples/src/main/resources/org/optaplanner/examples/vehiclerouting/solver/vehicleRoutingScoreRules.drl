@@ -38,14 +38,15 @@ global HardSoftLongScoreHolder scoreHolder;
 rule "vehicleCapacity"
     when
         $vehicle : Vehicle($capacity : capacity)
-        $demandTotal : Number(intValue > $capacity) from accumulate(
+        accumulate(
             Customer(
                 vehicle == $vehicle,
-                $demand : demand),
-            sum($demand)
+                $demand : demand);
+            $demandTotal : sum($demand);
+            $demandTotal > $capacity
         )
     then
-        scoreHolder.addHardConstraintMatch(kcontext, $capacity - $demandTotal.intValue());
+        scoreHolder.addHardConstraintMatch(kcontext, $capacity - $demandTotal);
 end
 
 // ############################################################################
@@ -70,7 +71,7 @@ end
 
 
 // ############################################################################
-// TimeWindowed: extra hard constraints
+// TimeWindowed: additional hard constraints
 // ############################################################################
 
 rule "arrivalAfterDueTime"
@@ -80,4 +81,4 @@ rule "arrivalAfterDueTime"
         scoreHolder.addHardConstraintMatch(kcontext, $dueTime - $arrivalTime.longValue());
 end
 
-// Score constraint arrivalAfterDueTimeAtDepot is a build-in hard constraint in VehicleRoutingImporter
+// Score constraint arrivalAfterDueTimeAtDepot is a built-in hard constraint in VehicleRoutingImporter

@@ -17,16 +17,14 @@
 package org.optaplanner.core.impl.localsearch.decider;
 
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
-import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.heuristic.selector.move.MoveSelector;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.Acceptor;
-import org.optaplanner.core.impl.localsearch.decider.forager.Forager;
+import org.optaplanner.core.impl.localsearch.decider.forager.LocalSearchForager;
 import org.optaplanner.core.impl.localsearch.scope.LocalSearchMoveScope;
 import org.optaplanner.core.impl.localsearch.scope.LocalSearchPhaseScope;
 import org.optaplanner.core.impl.localsearch.scope.LocalSearchStepScope;
 import org.optaplanner.core.impl.score.director.InnerScoreDirector;
-import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.core.impl.solver.scope.DefaultSolverScope;
 import org.optaplanner.core.impl.solver.termination.Termination;
 import org.slf4j.Logger;
@@ -39,44 +37,38 @@ public class LocalSearchDecider<Solution_> {
 
     protected final transient Logger logger = LoggerFactory.getLogger(getClass());
 
-    protected Termination termination;
-    protected MoveSelector moveSelector;
-    protected Acceptor acceptor;
-    protected Forager forager;
+    protected final String logIndentation;
+    protected final Termination termination;
+    protected final MoveSelector moveSelector;
+    protected final Acceptor acceptor;
+    protected final LocalSearchForager forager;
 
     protected boolean assertMoveScoreFromScratch = false;
     protected boolean assertExpectedUndoMoveScore = false;
 
-    public Termination getTermination() {
-        return termination;
+    public LocalSearchDecider(String logIndentation,
+            Termination termination, MoveSelector moveSelector, Acceptor acceptor, LocalSearchForager forager) {
+        this.logIndentation = logIndentation;
+        this.termination = termination;
+        this.moveSelector = moveSelector;
+        this.acceptor = acceptor;
+        this.forager = forager;
     }
 
-    public void setTermination(Termination termination) {
-        this.termination = termination;
+    public Termination getTermination() {
+        return termination;
     }
 
     public MoveSelector getMoveSelector() {
         return moveSelector;
     }
 
-    public void setMoveSelector(MoveSelector moveSelector) {
-        this.moveSelector = moveSelector;
-    }
-
-    public void setAcceptor(Acceptor acceptor) {
-        this.acceptor = acceptor;
-    }
-
     public Acceptor getAcceptor() {
         return acceptor;
     }
 
-    public Forager getForager() {
+    public LocalSearchForager getForager() {
         return forager;
-    }
-
-    public void setForager(Forager forager) {
-        this.forager = forager;
     }
 
     public void setAssertMoveScoreFromScratch(boolean assertMoveScoreFromScratch) {
@@ -110,66 +102,59 @@ public class LocalSearchDecider<Solution_> {
     }
 
     public void decideNextStep(LocalSearchStepScope<Solution_> stepScope) {
-        InnerScoreDirector scoreDirector = stepScope.getScoreDirector();
+        InnerScoreDirector<Solution_> scoreDirector = stepScope.getScoreDirector();
         scoreDirector.setAllChangesWillBeUndoneBeforeStepEnds(true);
         int moveIndex = 0;
-        for (Move move : moveSelector) {
-            LocalSearchMoveScope<Solution_> moveScope = new LocalSearchMoveScope<>(stepScope);
-            moveScope.setMoveIndex(moveIndex);
+        for (Move<Solution_> move : moveSelector) {
+            LocalSearchMoveScope<Solution_> moveScope = new LocalSearchMoveScope<>(stepScope, moveIndex, move);
             moveIndex++;
-            moveScope.setMove(move);
             // TODO use Selector filtering to filter out not doable moves
             if (!move.isMoveDoable(scoreDirector)) {
-                logger.trace("        Move index ({}) not doable, ignoring move ({}).", moveScope.getMoveIndex(), move);
+                logger.trace("{}        Move index ({}) not doable, ignoring move ({}).",
+                        logIndentation, moveScope.getMoveIndex(), move);
             } else {
                 doMove(moveScope);
                 if (forager.isQuitEarly()) {
                     break;
                 }
             }
+            stepScope.getPhaseScope().getSolverScope().checkYielding();
             if (termination.isPhaseTerminated(stepScope.getPhaseScope())) {
                 break;
             }
         }
         scoreDirector.setAllChangesWillBeUndoneBeforeStepEnds(false);
-        LocalSearchMoveScope<Solution_> pickedMoveScope = forager.pickMove(stepScope);
-        if (pickedMoveScope != null) {
-            Move step = pickedMoveScope.getMove();
-            stepScope.setStep(step);
-            if (logger.isDebugEnabled()) {
-                stepScope.setStepString(step.toString());
-            }
-            stepScope.setUndoStep(pickedMoveScope.getUndoMove());
-            stepScope.setScore(pickedMoveScope.getScore());
-        }
+        pickMove(stepScope);
     }
 
-    private void doMove(LocalSearchMoveScope<Solution_> moveScope) {
-        ScoreDirector scoreDirector = moveScope.getScoreDirector();
-        Move move = moveScope.getMove();
-        Move undoMove = move.createUndoMove(scoreDirector);
-        moveScope.setUndoMove(undoMove);
-        move.doMove(scoreDirector);
-        processMove(moveScope);
-        undoMove.doMove(scoreDirector);
+    protected void doMove(LocalSearchMoveScope<Solution_> moveScope) {
+        InnerScoreDirector<Solution_> scoreDirector = moveScope.getScoreDirector();
+        scoreDirector.doAndProcessMove(moveScope.getMove(), assertMoveScoreFromScratch, score -> {
+                    moveScope.setScore(score);
+                    boolean accepted = acceptor.isAccepted(moveScope);
+                    moveScope.setAccepted(accepted);
+                    forager.addMove(moveScope);
+                });
         if (assertExpectedUndoMoveScore) {
-            LocalSearchPhaseScope<Solution_> phaseScope = moveScope.getStepScope().getPhaseScope();
-            phaseScope.assertExpectedUndoMoveScore(move, undoMove, phaseScope.getLastCompletedStepScope().getScore());
+            scoreDirector.assertExpectedUndoMoveScore(moveScope.getMove(),
+                    moveScope.getStepScope().getPhaseScope().getLastCompletedStepScope().getScore());
         }
-        logger.trace("        Move index ({}), score ({}), accepted ({}), move ({}).",
+        logger.trace("{}        Move index ({}), score ({}), accepted ({}), move ({}).",
+                logIndentation,
                 moveScope.getMoveIndex(), moveScope.getScore(), moveScope.getAccepted(),
                 moveScope.getMove());
     }
 
-    private void processMove(LocalSearchMoveScope<Solution_> moveScope) {
-        Score score = moveScope.getStepScope().getPhaseScope().calculateScore();
-        if (assertMoveScoreFromScratch) {
-            moveScope.getStepScope().getPhaseScope().assertWorkingScoreFromScratch(score, moveScope.getMove());
+    protected void pickMove(LocalSearchStepScope<Solution_> stepScope) {
+        LocalSearchMoveScope<Solution_> pickedMoveScope = forager.pickMove(stepScope);
+        if (pickedMoveScope != null) {
+            Move<Solution_> step = pickedMoveScope.getMove();
+            stepScope.setStep(step);
+            if (logger.isDebugEnabled()) {
+                stepScope.setStepString(step.toString());
+            }
+            stepScope.setScore(pickedMoveScope.getScore());
         }
-        moveScope.setScore(score);
-        boolean accepted = acceptor.isAccepted(moveScope);
-        moveScope.setAccepted(accepted);
-        forager.addMove(moveScope);
     }
 
     public void stepEnded(LocalSearchStepScope<Solution_> stepScope) {

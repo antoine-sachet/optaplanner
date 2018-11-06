@@ -50,6 +50,11 @@ public class HardSoftLongScoreDefinition extends AbstractFeasibilityScoreDefinit
     }
 
     @Override
+    public HardSoftLongScore getZeroScore() {
+        return HardSoftLongScore.ZERO;
+    }
+
+    @Override
     public HardSoftLongScore parseScore(String scoreString) {
         return HardSoftLongScore.parseScore(scoreString);
     }
@@ -60,7 +65,7 @@ public class HardSoftLongScoreDefinition extends AbstractFeasibilityScoreDefinit
             throw new IllegalStateException("The levelNumbers (" + Arrays.toString(levelNumbers)
                     + ")'s length (" + levelNumbers.length + ") must equal the levelSize (" + getLevelsSize() + ").");
         }
-        return HardSoftLongScore.valueOf(initScore, (Long) levelNumbers[0], (Long) levelNumbers[1]);
+        return HardSoftLongScore.ofUninitialized(initScore, (Long) levelNumbers[0], (Long) levelNumbers[1]);
     }
 
     @Override
@@ -71,7 +76,7 @@ public class HardSoftLongScoreDefinition extends AbstractFeasibilityScoreDefinit
     @Override
     public HardSoftLongScore buildOptimisticBound(InitializingScoreTrend initializingScoreTrend, HardSoftLongScore score) {
         InitializingScoreTrendLevel[] trendLevels = initializingScoreTrend.getTrendLevels();
-        return HardSoftLongScore.valueOf(0,
+        return HardSoftLongScore.ofUninitialized(0,
                 trendLevels[0] == InitializingScoreTrendLevel.ONLY_DOWN ? score.getHardScore() : Long.MAX_VALUE,
                 trendLevels[1] == InitializingScoreTrendLevel.ONLY_DOWN ? score.getSoftScore() : Long.MAX_VALUE);
     }
@@ -79,7 +84,7 @@ public class HardSoftLongScoreDefinition extends AbstractFeasibilityScoreDefinit
     @Override
     public HardSoftLongScore buildPessimisticBound(InitializingScoreTrend initializingScoreTrend, HardSoftLongScore score) {
         InitializingScoreTrendLevel[] trendLevels = initializingScoreTrend.getTrendLevels();
-        return HardSoftLongScore.valueOf(0,
+        return HardSoftLongScore.ofUninitialized(0,
                 trendLevels[0] == InitializingScoreTrendLevel.ONLY_UP ? score.getHardScore() : Long.MIN_VALUE,
                 trendLevels[1] == InitializingScoreTrendLevel.ONLY_UP ? score.getSoftScore() : Long.MIN_VALUE);
     }

@@ -105,22 +105,23 @@ public class MixedCheckBox extends JCheckBox {
 
         private void switchStatus() {
             switch (getStatus()) {
-                case CHECKED: {
+                case CHECKED:
                     setStatus(MixedCheckBoxStatus.UNCHECKED);
                     break;
-                }
-                case UNCHECKED: {
+                case UNCHECKED:
                     setStatus(MixedCheckBoxStatus.CHECKED);
                     break;
-                }
-                case MIXED: {
+                case MIXED:
                     setStatus(MixedCheckBoxStatus.CHECKED);
-                }
+                    break;
+                default:
+                    throw new IllegalStateException("The status (" + getStatus() + ") is not implemented.");
             }
         }
     }
 
-    public static enum MixedCheckBoxStatus {
+    public enum MixedCheckBoxStatus {
         CHECKED, UNCHECKED, MIXED
     }
+
 }

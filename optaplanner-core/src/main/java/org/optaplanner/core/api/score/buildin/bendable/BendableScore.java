@@ -51,7 +51,7 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
         for (int i = 0; i < softScores.length; i++) {
             softScores[i] = parseLevelAsInt(BendableScore.class, scoreString, scoreTokens[2][i]);
         }
-        return valueOf(initScore, hardScores, softScores);
+        return ofUninitialized(initScore, hardScores, softScores);
     }
 
     /**
@@ -61,7 +61,15 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
      * @param softScores never null, never change that array afterwards: it must be immutable
      * @return never null
      */
-    public static BendableScore valueOf(int initScore, int[] hardScores, int[] softScores) {
+    public static BendableScore ofUninitialized(int initScore, int[] hardScores, int[] softScores) {
+        return new BendableScore(initScore, hardScores, softScores);
+    }
+
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, int[], int[])}
+     */
+    @Deprecated
+    public static BendableScore valueOfUninitialized(int initScore, int[] hardScores, int[] softScores) {
         return new BendableScore(initScore, hardScores, softScores);
     }
 
@@ -71,8 +79,54 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
      * @param softScores never null, never change that array afterwards: it must be immutable
      * @return never null
      */
-    public static BendableScore valueOfInitialized(int[] hardScores, int[] softScores) {
+    public static BendableScore of(int[] hardScores, int[] softScores) {
         return new BendableScore(0, hardScores, softScores);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(int[], int[])}
+     */
+    @Deprecated
+    public static BendableScore valueOf(int[] hardScores, int[] softScores) {
+        return new BendableScore(0, hardScores, softScores);
+    }
+
+    /**
+     * Creates a new {@link BendableScore}.
+     * @param hardLevelsSize at least 0
+     * @param softLevelsSize at least 0
+     * @return never null
+     */
+    public static BendableScore zero(int hardLevelsSize, int softLevelsSize) {
+        return new BendableScore(0, new int[hardLevelsSize], new int[softLevelsSize]);
+    }
+
+    /**
+     * Creates a new {@link BendableScore}.
+     * @param hardLevelsSize at least 0
+     * @param softLevelsSize at least 0
+     * @param hardLevel at least 0, less than hardLevelsSize
+     * @param hardScore any
+     * @return never null
+     */
+    public static BendableScore ofHard(int hardLevelsSize, int softLevelsSize, int hardLevel, int hardScore) {
+        int[] hardScores = new int[hardLevelsSize];
+        hardScores[hardLevel] = hardScore;
+        return new BendableScore(0, hardScores, new int[softLevelsSize]);
+    }
+
+    /**
+     * Creates a new {@link BendableScore}.
+     * @param hardLevelsSize at least 0
+     * @param softLevelsSize at least 0
+     * @param softLevel at least 0, less than softLevelsSize
+     * @param softScore any
+     * @return never null
+     */
+    public static BendableScore ofSoft(int hardLevelsSize, int softLevelsSize, int softLevel, int softScore) {
+        int[] softScores = new int[softLevelsSize];
+        softScores[softLevel] = softScore;
+        return new BendableScore(0, new int[hardLevelsSize], softScores);
     }
 
     // ************************************************************************
@@ -105,38 +159,46 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
         this.softScores = softScores;
     }
 
-    // Intentionally no getters for the hardScores or softScores int arrays to guarantee that this class is immutable
+    /**
+     * @return not null, array copy because this class is immutable
+     */
+    public int[] getHardScores() {
+        return Arrays.copyOf(hardScores, hardScores.length);
+    }
 
     /**
-     * @return {@code >= 0}
+     * @return not null, array copy because this class is immutable
      */
+    public int[] getSoftScores() {
+        return Arrays.copyOf(softScores, softScores.length);
+    }
+
     @Override
     public int getHardLevelsSize() {
         return hardScores.length;
     }
 
     /**
-     * @param index {@code 0 <= index <} {@link #getHardLevelsSize()}
+     * @param hardLevel {@code 0 <= hardLevel <} {@link #getHardLevelsSize()}.
+     * The {@code scoreLevel} is {@code hardLevel} for hard levels and {@code softLevel + hardLevelSize} for soft levels.
      * @return higher is better
      */
-    public int getHardScore(int index) {
-        return hardScores[index];
+    public int getHardScore(int hardLevel) {
+        return hardScores[hardLevel];
     }
 
-    /**
-     * @return {@code >= 0}
-     */
     @Override
     public int getSoftLevelsSize() {
         return softScores.length;
     }
 
     /**
-     * @param index {@code 0 <= index <} {@link #getSoftLevelsSize()}
+     * @param softLevel {@code 0 <= softLevel <} {@link #getSoftLevelsSize()}.
+     * The {@code scoreLevel} is {@code hardLevel} for hard levels and {@code softLevel + hardLevelSize} for soft levels.
      * @return higher is better
      */
-    public int getSoftScore(int index) {
-        return softScores[index];
+    public int getSoftScore(int softLevel) {
+        return softScores[softLevel];
     }
 
     // ************************************************************************
@@ -149,19 +211,25 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
     }
 
     @Override
+    public BendableScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new BendableScore(newInitScore, hardScores, softScores);
+    }
+
+    @Override
     public int getLevelsSize() {
         return hardScores.length + softScores.length;
     }
 
     /**
-     * @param index {@code 0 <= index <} {@link #getLevelsSize()}
+     * @param level {@code 0 <= level <} {@link #getLevelsSize()}
      * @return higher is better
      */
-    public int getHardOrSoftScore(int index) {
-        if (index < hardScores.length) {
-            return hardScores[index];
+    public int getHardOrSoftScore(int level) {
+        if (level < hardScores.length) {
+            return hardScores[level];
         } else {
-            return softScores[index - hardScores.length];
+            return softScores[level - hardScores.length];
         }
     }
 
@@ -171,9 +239,7 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
             return false;
         }
         for (int hardScore : hardScores) {
-            if (hardScore > 0) {
-                return true;
-            } else if (hardScore < 0) {
+            if (hardScore < 0) {
                 return false;
             }
         }
@@ -282,6 +348,7 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
         return levelNumbers;
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -311,6 +378,7 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
         int hashCode = (17 * 37) + initScore;
@@ -337,6 +405,11 @@ public final class BendableScore extends AbstractBendableScore<BendableScore>
             }
         }
         return 0;
+    }
+
+    @Override
+    public String toShortString() {
+        return buildBendableShortString((n) -> ((Integer) n).intValue() != 0);
     }
 
     @Override

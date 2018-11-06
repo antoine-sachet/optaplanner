@@ -39,18 +39,13 @@ public class ShiftAssignmentPillarPartSwapMoveFactory implements MoveListFactory
     private MovableShiftAssignmentSelectionFilter filter = new MovableShiftAssignmentSelectionFilter();
 
     @Override
-    public List<Move> createMoveList(NurseRoster nurseRoster) {
+    public List<Move<NurseRoster>> createMoveList(NurseRoster nurseRoster) {
         List<Employee> employeeList = nurseRoster.getEmployeeList();
         // This code assumes the shiftAssignmentList is sorted
         // Filter out every immovable ShiftAssignment
         List<ShiftAssignment> shiftAssignmentList = new ArrayList<>(
                 nurseRoster.getShiftAssignmentList());
-        for (Iterator<ShiftAssignment> it = shiftAssignmentList.iterator(); it.hasNext(); ) {
-            ShiftAssignment shiftAssignment = it.next();
-            if (!filter.accept(nurseRoster, shiftAssignment)) {
-                it.remove();
-            }
-        }
+        shiftAssignmentList.removeIf(shiftAssignment -> !filter.accept(nurseRoster, shiftAssignment));
 
         // Hash the assignments per employee
         Map<Employee, List<AssignmentSequence>> employeeToAssignmentSequenceListMap
@@ -79,7 +74,7 @@ public class ShiftAssignmentPillarPartSwapMoveFactory implements MoveListFactory
         }
 
         // The create the move list
-        List<Move> moveList = new ArrayList<>();
+        List<Move<NurseRoster>> moveList = new ArrayList<>();
         // For every 2 distinct employees
         for (ListIterator<Employee> leftEmployeeIt = employeeList.listIterator(); leftEmployeeIt.hasNext();) {
             Employee leftEmployee = leftEmployeeIt.next();
@@ -96,9 +91,9 @@ public class ShiftAssignmentPillarPartSwapMoveFactory implements MoveListFactory
                 // For every pillar part duo
                 while (lowestIt.hasNext()) {
                     AssignmentSequence pillarPartAssignmentSequence = lowestIt.next();
-                    // Note: the initialCapacity is probably to high,
+                    // Note: the initialCapacity is probably too high,
                     // which is bad for memory, but the opposite is bad for performance (which is worse)
-                    List<Move> moveListByPillarPartDuo = new ArrayList<>(
+                    List<EmployeeMultipleChangeMove> moveListByPillarPartDuo = new ArrayList<>(
                             leftAssignmentSequenceList.size() + rightAssignmentSequenceList.size());
                     int lastDayIndex = pillarPartAssignmentSequence.getLastDayIndex();
                     Employee otherEmployee;

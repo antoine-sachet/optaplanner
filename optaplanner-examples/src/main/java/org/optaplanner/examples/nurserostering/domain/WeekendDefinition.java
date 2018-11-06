@@ -16,6 +16,7 @@
 
 package org.optaplanner.examples.nurserostering.domain;
 
+import java.time.DayOfWeek;
 import java.util.EnumSet;
 
 public enum WeekendDefinition {
@@ -77,6 +78,7 @@ public enum WeekendDefinition {
         return lastDayOfWeekend;
     }
 
+    @Override
     public String toString() {
         return code;
     }

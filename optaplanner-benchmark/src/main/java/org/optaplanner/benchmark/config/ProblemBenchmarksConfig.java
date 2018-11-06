@@ -18,13 +18,18 @@ package org.optaplanner.benchmark.config;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamImplicit;
-import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.BooleanUtils;
+import org.optaplanner.benchmark.api.PlannerBenchmarkFactory;
 import org.optaplanner.benchmark.config.statistic.ProblemStatisticType;
 import org.optaplanner.benchmark.config.statistic.SingleStatisticType;
+import org.optaplanner.benchmark.impl.loader.FileProblemProvider;
+import org.optaplanner.benchmark.impl.loader.InstanceProblemProvider;
+import org.optaplanner.benchmark.impl.loader.ProblemProvider;
 import org.optaplanner.benchmark.impl.result.PlannerBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.ProblemBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.SingleBenchmarkResult;
@@ -32,7 +37,9 @@ import org.optaplanner.benchmark.impl.result.SolverBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.SubSingleBenchmarkResult;
 import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
 import org.optaplanner.core.config.AbstractConfig;
+import org.optaplanner.core.config.SolverConfigContext;
 import org.optaplanner.core.config.util.ConfigUtils;
+import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
 import org.optaplanner.persistence.xstream.impl.domain.solution.XStreamSolutionFileIO;
 
@@ -47,11 +54,16 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
     @XStreamImplicit(itemFieldName = "inputSolutionFile")
     private List<File> inputSolutionFileList = null;
 
+    private Boolean problemStatisticEnabled = null;
     @XStreamImplicit(itemFieldName = "problemStatisticType")
     private List<ProblemStatisticType> problemStatisticTypeList = null;
 
     @XStreamImplicit(itemFieldName = "singleStatisticType")
     private List<SingleStatisticType> singleStatisticTypeList = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public Class<SolutionFileIO> getSolutionFileIOClass() {
         return solutionFileIOClass;
@@ -85,6 +97,14 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
         this.inputSolutionFileList = inputSolutionFileList;
     }
 
+    public Boolean getProblemStatisticEnabled() {
+        return problemStatisticEnabled;
+    }
+
+    public void setProblemStatisticEnabled(Boolean problemStatisticEnabled) {
+        this.problemStatisticEnabled = problemStatisticEnabled;
+    }
+
     public List<ProblemStatisticType> getProblemStatisticTypeList() {
         return problemStatisticTypeList;
     }
@@ -105,20 +125,16 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
     // Builder methods
     // ************************************************************************
 
-    public void buildProblemBenchmarkList(SolverBenchmarkResult solverBenchmarkResult) {
-        validate(solverBenchmarkResult);
+    public <Solution_> void buildProblemBenchmarkList(SolverConfigContext solverConfigContext,
+            SolverBenchmarkResult solverBenchmarkResult, Solution_[] extraProblems) {
         PlannerBenchmarkResult plannerBenchmarkResult = solverBenchmarkResult.getPlannerBenchmarkResult();
-        SolutionFileIO solutionFileIO = buildSolutionFileIO();
-        List<ProblemBenchmarkResult> problemBenchmarkResultList = new ArrayList<>(inputSolutionFileList.size());
         List<ProblemBenchmarkResult> unifiedProblemBenchmarkResultList
                 = plannerBenchmarkResult.getUnifiedProblemBenchmarkResultList();
-        for (File inputSolutionFile : inputSolutionFileList) {
-            if (!inputSolutionFile.exists()) {
-                throw new IllegalArgumentException("The inputSolutionFile (" + inputSolutionFile + ") does not exist.");
-            }
+        for (ProblemProvider<Solution_> problemProvider : buildProblemProviderList(
+                solverConfigContext, solverBenchmarkResult, extraProblems)) {
             // 2 SolverBenchmarks containing equal ProblemBenchmarks should contain the same instance
-            ProblemBenchmarkResult newProblemBenchmarkResult = buildProblemBenchmark(plannerBenchmarkResult,
-                    solutionFileIO, inputSolutionFile);
+            ProblemBenchmarkResult<Solution_> newProblemBenchmarkResult = buildProblemBenchmark(
+                    solverConfigContext, plannerBenchmarkResult, problemProvider);
             ProblemBenchmarkResult problemBenchmarkResult;
             int index = unifiedProblemBenchmarkResultList.indexOf(newProblemBenchmarkResult);
             if (index < 0) {
@@ -127,23 +143,56 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
             } else {
                 problemBenchmarkResult = unifiedProblemBenchmarkResultList.get(index);
             }
-            problemBenchmarkResultList.add(problemBenchmarkResult);
-            buildSingleBenchmark(solverBenchmarkResult, problemBenchmarkResult);
+            buildSingleBenchmark(solverConfigContext, solverBenchmarkResult, problemBenchmarkResult);
         }
     }
 
-    private void validate(SolverBenchmarkResult solverBenchmarkResult) {
-        if (ConfigUtils.isEmptyCollection(inputSolutionFileList)) {
+    private <Solution_> List<ProblemProvider<Solution_>> buildProblemProviderList(
+            SolverConfigContext solverConfigContext, SolverBenchmarkResult solverBenchmarkResult,
+            Solution_[] extraProblems) {
+        if (ConfigUtils.isEmptyCollection(inputSolutionFileList) && extraProblems.length == 0) {
             throw new IllegalArgumentException(
-                    "Configure at least 1 <inputSolutionFile> for the solverBenchmarkResult (" + solverBenchmarkResult.getName()
-                            + ") directly or indirectly by inheriting it.");
+                    "The solverBenchmarkResult (" + solverBenchmarkResult.getName() + ") has no problems.\n"
+                    + "Maybe configure at least 1 <inputSolutionFile> directly or indirectly by inheriting it.\n"
+                    + "Or maybe pass at least one problem to " + PlannerBenchmarkFactory.class.getSimpleName()
+                    + ".buildPlannerBenchmark().");
         }
+        List<ProblemProvider<Solution_>> problemProviderList = new ArrayList<>(
+                extraProblems.length + (inputSolutionFileList == null ? 0 : inputSolutionFileList.size()));
+        SolutionDescriptor<Solution_> solutionDescriptor = solverBenchmarkResult.getSolverConfig()
+                .buildSolutionDescriptor(solverConfigContext);
+        int extraProblemIndex = 0;
+        for (Solution_ extraProblem : extraProblems) {
+            if (extraProblem == null) {
+                throw new IllegalStateException("The benchmark problem (" + extraProblem + ") is null.");
+            }
+            String problemName = "Problem_" + extraProblemIndex;
+            problemProviderList.add(new InstanceProblemProvider<>(problemName, solutionDescriptor, extraProblem));
+            extraProblemIndex++;
+        }
+        if (ConfigUtils.isEmptyCollection(inputSolutionFileList)) {
+            if (solutionFileIOClass != null || xStreamAnnotatedClassList != null) {
+                throw new IllegalArgumentException("Cannot use solutionFileIOClass (" + solutionFileIOClass
+                        + ") or xStreamAnnotatedClassList (" + xStreamAnnotatedClassList
+                        + ") with an empty inputSolutionFileList (" + inputSolutionFileList + ").");
+            }
+        } else {
+            SolutionFileIO<Solution_> solutionFileIO = buildSolutionFileIO();
+            for (File inputSolutionFile : inputSolutionFileList) {
+                if (!inputSolutionFile.exists()) {
+                    throw new IllegalArgumentException("The inputSolutionFile (" + inputSolutionFile
+                            + ") does not exist.");
+                }
+                problemProviderList.add(new FileProblemProvider<>(solutionFileIO, inputSolutionFile));
+            }
+        }
+        return problemProviderList;
     }
 
-    private SolutionFileIO buildSolutionFileIO() {
+    private <Solution_> SolutionFileIO<Solution_> buildSolutionFileIO() {
         if (solutionFileIOClass != null && xStreamAnnotatedClassList != null) {
-            throw new IllegalArgumentException("Cannot use solutionFileIOClass (" + solutionFileIOClass
-                    + ") and xStreamAnnotatedClassList (" + xStreamAnnotatedClassList + ") together.");
+            throw new IllegalArgumentException("The solutionFileIOClass (" + solutionFileIOClass
+                    + ") and xStreamAnnotatedClassList (" + xStreamAnnotatedClassList + ") can be used together.");
         }
         if (solutionFileIOClass != null) {
             return ConfigUtils.newInstance(this, "solutionFileIOClass", solutionFileIOClass);
@@ -154,33 +203,40 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
             } else {
                 xStreamAnnotatedClasses = new Class[0];
             }
-            return new XStreamSolutionFileIO(xStreamAnnotatedClasses);
+            return new XStreamSolutionFileIO<>(xStreamAnnotatedClasses);
         }
     }
 
-    private ProblemBenchmarkResult buildProblemBenchmark(PlannerBenchmarkResult plannerBenchmarkResult,
-            SolutionFileIO solutionFileIO, File inputSolutionFile) {
-        ProblemBenchmarkResult problemBenchmarkResult = new ProblemBenchmarkResult(plannerBenchmarkResult);
-        String name = FilenameUtils.getBaseName(inputSolutionFile.getName());
-        problemBenchmarkResult.setName(name);
-        problemBenchmarkResult.setSolutionFileIO(solutionFileIO);
+    private <Solution_> ProblemBenchmarkResult<Solution_> buildProblemBenchmark(SolverConfigContext solverConfigContext,
+            PlannerBenchmarkResult plannerBenchmarkResult,
+            ProblemProvider<Solution_> problemProvider) {
+        ProblemBenchmarkResult<Solution_> problemBenchmarkResult = new ProblemBenchmarkResult<>(plannerBenchmarkResult);
+        problemBenchmarkResult.setName(problemProvider.getProblemName());
+        problemBenchmarkResult.setProblemProvider(problemProvider);
         problemBenchmarkResult.setWriteOutputSolutionEnabled(
                 writeOutputSolutionEnabled == null ? false : writeOutputSolutionEnabled);
-        problemBenchmarkResult.setInputSolutionFile(inputSolutionFile);
-        List<ProblemStatistic> problemStatisticList = new ArrayList<>(
-                problemStatisticTypeList == null ? 0 : problemStatisticTypeList.size());
-        if (problemStatisticTypeList != null) {
-            for (ProblemStatisticType problemStatisticType : problemStatisticTypeList) {
+        List<ProblemStatistic> problemStatisticList;
+        if (BooleanUtils.isFalse(problemStatisticEnabled)) {
+            if (!ConfigUtils.isEmptyCollection(problemStatisticTypeList)) {
+                throw new IllegalArgumentException("The problemStatisticEnabled (" + problemStatisticEnabled
+                        + ") and problemStatisticTypeList (" + problemStatisticTypeList + ") can be used together.");
+            }
+            problemStatisticList = Collections.emptyList();
+        } else {
+            List<ProblemStatisticType> problemStatisticTypeList_ = (problemStatisticTypeList == null)
+                    ? Collections.singletonList(ProblemStatisticType.BEST_SCORE) : problemStatisticTypeList;
+            problemStatisticList = new ArrayList<>(problemStatisticTypeList_.size());
+            for (ProblemStatisticType problemStatisticType : problemStatisticTypeList_) {
                 problemStatisticList.add(problemStatisticType.buildProblemStatistic(problemBenchmarkResult));
             }
         }
         problemBenchmarkResult.setProblemStatisticList(problemStatisticList);
-        problemBenchmarkResult.setSingleBenchmarkResultList(new ArrayList<SingleBenchmarkResult>());
+        problemBenchmarkResult.setSingleBenchmarkResultList(new ArrayList<>());
         return problemBenchmarkResult;
     }
 
-    private void buildSingleBenchmark(SolverBenchmarkResult solverBenchmarkResult,
-            ProblemBenchmarkResult problemBenchmarkResult) {
+    private void buildSingleBenchmark(SolverConfigContext solverConfigContext,
+            SolverBenchmarkResult solverBenchmarkResult, ProblemBenchmarkResult problemBenchmarkResult) {
         SingleBenchmarkResult singleBenchmarkResult = new SingleBenchmarkResult(solverBenchmarkResult, problemBenchmarkResult);
         buildSubSingleBenchmarks(singleBenchmarkResult, solverBenchmarkResult.getSubSingleCount());
         for (SubSingleBenchmarkResult subSingleBenchmarkResult : singleBenchmarkResult.getSubSingleBenchmarkResultList()) {
@@ -190,7 +246,8 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
         if (singleStatisticTypeList != null) {
             for (SingleStatisticType singleStatisticType : singleStatisticTypeList) {
                 for (SubSingleBenchmarkResult subSingleBenchmarkResult : singleBenchmarkResult.getSubSingleBenchmarkResultList()) {
-                    subSingleBenchmarkResult.getPureSubSingleStatisticList().add(singleStatisticType.buildPureSubSingleStatistic(subSingleBenchmarkResult));
+                    subSingleBenchmarkResult.getPureSubSingleStatisticList().add(
+                            singleStatisticType.buildPureSubSingleStatistic(subSingleBenchmarkResult));
                 }
             }
         }
@@ -218,6 +275,8 @@ public class ProblemBenchmarksConfig extends AbstractConfig<ProblemBenchmarksCon
                 inheritedConfig.getWriteOutputSolutionEnabled());
         inputSolutionFileList = ConfigUtils.inheritMergeableListProperty(inputSolutionFileList,
                 inheritedConfig.getInputSolutionFileList());
+        problemStatisticEnabled = ConfigUtils.inheritOverwritableProperty(problemStatisticEnabled,
+                inheritedConfig.getProblemStatisticEnabled());
         problemStatisticTypeList = ConfigUtils.inheritMergeableListProperty(problemStatisticTypeList,
                 inheritedConfig.getProblemStatisticTypeList());
         singleStatisticTypeList = ConfigUtils.inheritMergeableListProperty(singleStatisticTypeList,

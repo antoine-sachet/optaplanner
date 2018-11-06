@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plannerBenchmark>
   <benchmarkDirectory>local/data/examination/stepLimit</benchmarkDirectory>
+  <warmUpSecondsSpentLimit>0</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -14,7 +15,6 @@
       <entityClass>org.optaplanner.examples.examination.domain.LeadingExam</entityClass>
       <entityClass>org.optaplanner.examples.examination.domain.FollowingExam</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/examination/solver/examinationScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
     </solver>
@@ -32,15 +32,12 @@
               <entitySelector id="cartesianProductEntitySelector">
                 <entityClass>org.optaplanner.examples.examination.domain.Exam</entityClass>
               </entitySelector>
-              <valueSelector>
-                <variableName>room</variableName>
-              </valueSelector>
+              <valueSelector variableName="room"/>
             </changeMoveSelector>
             <changeMoveSelector>
               <entitySelector mimicSelectorRef="cartesianProductEntitySelector"/>
-              <valueSelector>
+              <valueSelector variableName="period">
                 <downcastEntityClass>org.optaplanner.examples.examination.domain.LeadingExam</downcastEntityClass>
-                <variableName>period</variableName>
               </valueSelector>
             </changeMoveSelector>
           </cartesianProductMoveSelector>

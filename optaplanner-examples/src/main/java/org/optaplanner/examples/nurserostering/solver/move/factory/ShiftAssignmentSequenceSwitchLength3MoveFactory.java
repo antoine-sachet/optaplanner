@@ -38,7 +38,7 @@ public class ShiftAssignmentSequenceSwitchLength3MoveFactory implements MoveList
     private MovableShiftAssignmentSelectionFilter filter = new MovableShiftAssignmentSelectionFilter();
 
     @Override
-    public List<Move> createMoveList(NurseRoster nurseRoster) {
+    public List<Move<NurseRoster>> createMoveList(NurseRoster nurseRoster) {
         List<Employee> employeeList = nurseRoster.getEmployeeList();
         // This code assumes the shiftAssignmentList is sorted
         // Filter out every immovable ShiftAssignment
@@ -78,7 +78,7 @@ public class ShiftAssignmentSequenceSwitchLength3MoveFactory implements MoveList
         }
 
         // The create the move list
-        List<Move> moveList = new ArrayList<>();
+        List<Move<NurseRoster>> moveList = new ArrayList<>();
         // For every 2 distinct employees
         for (ListIterator<Employee> leftEmployeeIt = employeeList.listIterator(); leftEmployeeIt.hasNext();) {
             Employee leftEmployee = leftEmployeeIt.next();
@@ -99,7 +99,7 @@ public class ShiftAssignmentSequenceSwitchLength3MoveFactory implements MoveList
                             List<ShiftAssignment> rightShiftAssignmentList = rightAssignmentSequence.getShiftAssignmentList();
                             for (int rightIndex = 0; rightIndex <= rightShiftAssignmentList.size() - SWITCH_LENGTH; rightIndex++) {
 
-                                List<Move> subMoveList = new ArrayList<>(SWITCH_LENGTH * 2);
+                                List<EmployeeChangeMove> subMoveList = new ArrayList<>(SWITCH_LENGTH * 2);
                                 for (ShiftAssignment leftShiftAssignment : leftShiftAssignmentList
                                         .subList(leftIndex, leftIndex + SWITCH_LENGTH)) {
                                     subMoveList.add(new EmployeeChangeMove(leftShiftAssignment, rightEmployee));

@@ -1,17 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plannerBenchmark>
   <benchmarkDirectory>local/data/general</benchmarkDirectory>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
+  <!--<warmUpMinutesSpentLimit>10</warmUpMinutesSpentLimit>-->
 
   <inheritedSolverBenchmark>
-    <problemBenchmarks>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
-    </problemBenchmarks>
     <solver>
       <termination>
         <minutesSpentLimit>5</minutesSpentLimit>
       </termination>
     </solver>
+    <!--<subSingleCount>8</subSingleCount>-->
   </inheritedSolverBenchmark>
 
 
@@ -26,7 +24,6 @@
       <solutionClass>org.optaplanner.examples.cloudbalancing.domain.CloudBalance</solutionClass>
       <entityClass>org.optaplanner.examples.cloudbalancing.domain.CloudProcess</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/cloudbalancing/solver/cloudBalancingScoreRules.drl</scoreDrl>
         <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>
       </scoreDirectorFactory>
@@ -58,7 +55,6 @@
       <solutionClass>org.optaplanner.examples.machinereassignment.domain.MachineReassignment</solutionClass>
       <entityClass>org.optaplanner.examples.machinereassignment.domain.MrProcessAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT_LONG</scoreDefinitionType>
         <incrementalScoreCalculatorClass>org.optaplanner.examples.machinereassignment.solver.score.MachineReassignmentIncrementalScoreCalculator</incrementalScoreCalculatorClass>
       </scoreDirectorFactory>
       <customPhase>
@@ -89,7 +85,6 @@
       <solutionClass>org.optaplanner.examples.curriculumcourse.domain.CourseSchedule</solutionClass>
       <entityClass>org.optaplanner.examples.curriculumcourse.domain.Lecture</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/curriculumcourse/solver/curriculumCourseScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <constructionHeuristic>
@@ -124,7 +119,6 @@
       <entityClass>org.optaplanner.examples.examination.domain.LeadingExam</entityClass>
       <entityClass>org.optaplanner.examples.examination.domain.FollowingExam</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/examination/solver/examinationScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <constructionHeuristic>
@@ -138,9 +132,8 @@
           <cartesianProductMoveSelector>
             <changeMoveSelector>
               <entitySelector mimicSelectorRef="placerEntitySelector"/>
-              <valueSelector>
+              <valueSelector variableName="period">
                 <downcastEntityClass>org.optaplanner.examples.examination.domain.LeadingExam</downcastEntityClass>
-                <variableName>period</variableName>
                 <cacheType>PHASE</cacheType>
                 <!--<selectionOrder>SORTED</selectionOrder>-->
                 <!--<sorterManner>INCREASING_STRENGTH</sorterManner>-->
@@ -148,8 +141,7 @@
             </changeMoveSelector>
             <changeMoveSelector>
               <entitySelector mimicSelectorRef="placerEntitySelector"/>
-              <valueSelector>
-                <variableName>room</variableName>
+              <valueSelector variableName="room">
                 <cacheType>PHASE</cacheType>
                 <selectionOrder>SORTED</selectionOrder>
                 <sorterManner>INCREASING_STRENGTH</sorterManner>
@@ -165,15 +157,12 @@
               <entitySelector id="cartesianProductEntitySelector">
                 <entityClass>org.optaplanner.examples.examination.domain.Exam</entityClass>
               </entitySelector>
-              <valueSelector>
-                <variableName>room</variableName>
-              </valueSelector>
+              <valueSelector variableName="room"/>
             </changeMoveSelector>
             <changeMoveSelector>
               <entitySelector mimicSelectorRef="cartesianProductEntitySelector"/>
-              <valueSelector>
+              <valueSelector variableName="period">
                 <downcastEntityClass>org.optaplanner.examples.examination.domain.LeadingExam</downcastEntityClass>
-                <variableName>period</variableName>
               </valueSelector>
             </changeMoveSelector>
           </cartesianProductMoveSelector>
@@ -203,7 +192,6 @@
       <solutionClass>org.optaplanner.examples.nurserostering.domain.NurseRoster</solutionClass>
       <entityClass>org.optaplanner.examples.nurserostering.domain.ShiftAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/nurserostering/solver/nurseRosteringScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <constructionHeuristic>
@@ -243,7 +231,6 @@
       <solutionClass>org.optaplanner.examples.travelingtournament.domain.TravelingTournament</solutionClass>
       <entityClass>org.optaplanner.examples.travelingtournament.domain.Match</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/travelingtournament/solver/travelingTournamentScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <localSearch>

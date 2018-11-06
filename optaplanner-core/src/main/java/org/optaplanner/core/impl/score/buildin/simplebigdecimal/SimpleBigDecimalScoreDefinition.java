@@ -45,6 +45,11 @@ public class SimpleBigDecimalScoreDefinition extends AbstractScoreDefinition<Sim
     }
 
     @Override
+    public SimpleBigDecimalScore getZeroScore() {
+        return SimpleBigDecimalScore.ZERO;
+    }
+
+    @Override
     public SimpleBigDecimalScore parseScore(String scoreString) {
         return SimpleBigDecimalScore.parseScore(scoreString);
     }
@@ -55,7 +60,7 @@ public class SimpleBigDecimalScoreDefinition extends AbstractScoreDefinition<Sim
             throw new IllegalStateException("The levelNumbers (" + Arrays.toString(levelNumbers)
                     + ")'s length (" + levelNumbers.length + ") must equal the levelSize (" + getLevelsSize() + ").");
         }
-        return SimpleBigDecimalScore.valueOf(initScore, (BigDecimal) levelNumbers[0]);
+        return SimpleBigDecimalScore.ofUninitialized(initScore, (BigDecimal) levelNumbers[0]);
     }
 
     @Override

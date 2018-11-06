@@ -19,18 +19,19 @@ package org.optaplanner.examples.nurserostering.app;
 import org.optaplanner.examples.common.app.CommonApp;
 import org.optaplanner.examples.common.persistence.AbstractSolutionExporter;
 import org.optaplanner.examples.common.persistence.AbstractSolutionImporter;
-import org.optaplanner.examples.common.persistence.SolutionDao;
-import org.optaplanner.examples.common.swingui.SolutionPanel;
 import org.optaplanner.examples.nurserostering.domain.NurseRoster;
-import org.optaplanner.examples.nurserostering.persistence.NurseRosteringDao;
 import org.optaplanner.examples.nurserostering.persistence.NurseRosteringExporter;
 import org.optaplanner.examples.nurserostering.persistence.NurseRosteringImporter;
 import org.optaplanner.examples.nurserostering.swingui.NurseRosteringPanel;
+import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
+import org.optaplanner.persistence.xstream.impl.domain.solution.XStreamSolutionFileIO;
 
 public class NurseRosteringApp extends CommonApp<NurseRoster> {
 
     public static final String SOLVER_CONFIG
             = "org/optaplanner/examples/nurserostering/solver/nurseRosteringSolverConfig.xml";
+
+    public static final String DATA_DIR_NAME = "nurserostering";
 
     public static void main(String[] args) {
         prepareSwingEnvironment();
@@ -38,21 +39,21 @@ public class NurseRosteringApp extends CommonApp<NurseRoster> {
     }
 
     public NurseRosteringApp() {
-        super("Employee rostering",
+        super("Nurse rostering",
                 "Official competition name: INRC2010 - Nurse rostering\n\n" +
-                        "Assign shifts to employees.",
-                SOLVER_CONFIG,
+                        "Assign shifts to nurses.",
+                SOLVER_CONFIG, DATA_DIR_NAME,
                 NurseRosteringPanel.LOGO_PATH);
     }
 
     @Override
-    protected SolutionPanel createSolutionPanel() {
+    protected NurseRosteringPanel createSolutionPanel() {
         return new NurseRosteringPanel();
     }
 
     @Override
-    protected SolutionDao createSolutionDao() {
-        return new NurseRosteringDao();
+    public SolutionFileIO<NurseRoster> createSolutionFileIO() {
+        return new XStreamSolutionFileIO<>(NurseRoster.class);
     }
 
     @Override

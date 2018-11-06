@@ -23,12 +23,12 @@ import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.examples.pas.domain.Bed;
 import org.optaplanner.examples.pas.domain.BedDesignation;
+import org.optaplanner.examples.pas.domain.PatientAdmissionSchedule;
 
-public class BedChangeMove extends AbstractMove {
+public class BedChangeMove extends AbstractMove<PatientAdmissionSchedule> {
 
     private BedDesignation bedDesignation;
     private Bed toBed;
@@ -39,18 +39,24 @@ public class BedChangeMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<PatientAdmissionSchedule> scoreDirector) {
         return !Objects.equals(bedDesignation.getBed(), toBed);
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public BedChangeMove createUndoMove(ScoreDirector<PatientAdmissionSchedule> scoreDirector) {
         return new BedChangeMove(bedDesignation, bedDesignation.getBed());
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<PatientAdmissionSchedule> scoreDirector) {
         PatientAdmissionMoveHelper.moveBed(scoreDirector, bedDesignation, toBed);
+    }
+
+    @Override
+    public BedChangeMove rebase(ScoreDirector<PatientAdmissionSchedule> destinationScoreDirector) {
+        return new BedChangeMove(destinationScoreDirector.lookUpWorkingObject(bedDesignation),
+                destinationScoreDirector.lookUpWorkingObject(toBed));
     }
 
     @Override
@@ -63,6 +69,7 @@ public class BedChangeMove extends AbstractMove {
         return Collections.singletonList(toBed);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -77,6 +84,7 @@ public class BedChangeMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(bedDesignation)
@@ -84,6 +92,7 @@ public class BedChangeMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         return bedDesignation + " {" + bedDesignation.getBed() + " -> " + toBed + "}";
     }

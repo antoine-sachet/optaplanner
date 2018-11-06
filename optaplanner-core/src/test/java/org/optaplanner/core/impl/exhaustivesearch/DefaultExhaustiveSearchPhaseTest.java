@@ -20,11 +20,9 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import org.junit.Test;
-import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.api.score.buildin.simple.SimpleScore;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.api.solver.SolverFactory;
-import org.optaplanner.core.config.constructionheuristic.ConstructionHeuristicPhaseConfig;
 import org.optaplanner.core.config.exhaustivesearch.ExhaustiveSearchPhaseConfig;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import org.optaplanner.core.impl.exhaustivesearch.decider.ExhaustiveSearchDecider;
@@ -44,9 +42,10 @@ import org.optaplanner.core.impl.testdata.domain.reinitialize.TestdataReinitiali
 import org.optaplanner.core.impl.testdata.domain.reinitialize.TestdataReinitializeSolution;
 import org.optaplanner.core.impl.testdata.util.PlannerTestUtils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.*;
-import static org.optaplanner.core.impl.testdata.util.PlannerAssert.assertCode;
+import static org.optaplanner.core.impl.testdata.util.PlannerAssert.*;
 
 public class DefaultExhaustiveSearchPhaseTest {
 
@@ -89,11 +88,11 @@ public class DefaultExhaustiveSearchPhaseTest {
         ExhaustiveSearchNode node4B = new ExhaustiveSearchNode(layer4, node3B); // newNode
         node4B.setMove(mock(Move.class));
         node4B.setUndoMove(mock(Move.class));
-        node4B.setScore(SimpleScore.valueOf(-96, 7));
+        node4B.setScore(SimpleScore.ofUninitialized(-96, 7));
         when(lastCompletedStepScope.getExpandingNode()).thenReturn(node3A);
         when(stepScope.getExpandingNode()).thenReturn(node4B);
 
-        DefaultExhaustiveSearchPhase<TestdataSolution> phase = new DefaultExhaustiveSearchPhase<>();
+        DefaultExhaustiveSearchPhase<TestdataSolution> phase = new DefaultExhaustiveSearchPhase<>(0, "", null, null);
         phase.setEntitySelector(mock(EntitySelector.class));
         phase.setDecider(mock(ExhaustiveSearchDecider.class));
         phase.restoreWorkingSolution(stepScope);
@@ -162,9 +161,9 @@ public class DefaultExhaustiveSearchPhaseTest {
         TestdataValue v3 = new TestdataValue("v3");
         solution.setValueList(Arrays.asList(v1, v2, v3));
         solution.setEntityList(Arrays.asList(
-                new TestdataImmovableEntity("e1", null, false),
-                new TestdataImmovableEntity("e2", v2, true),
-                new TestdataImmovableEntity("e3", null, true)));
+                new TestdataImmovableEntity("e1", null, false, false),
+                new TestdataImmovableEntity("e2", v2, true, false),
+                new TestdataImmovableEntity("e3", null, false, true)));
 
         solution = solver.solve(solution);
         assertNotNull(solution);
@@ -178,6 +177,26 @@ public class DefaultExhaustiveSearchPhaseTest {
         assertCode("e3", solvedE3);
         assertEquals(null, solvedE3.getValue());
         assertEquals(-1, solution.getScore().getInitScore());
+    }
+
+    @Test
+    public void solveWithEmptyEntityList() {
+        SolverFactory<TestdataSolution> solverFactory = PlannerTestUtils.buildSolverFactory(
+                TestdataSolution.class, TestdataEntity.class);
+        solverFactory.getSolverConfig().setPhaseConfigList(Collections.singletonList(
+                new ExhaustiveSearchPhaseConfig()));
+        Solver<TestdataSolution> solver = solverFactory.buildSolver();
+
+        TestdataSolution solution = new TestdataSolution("s1");
+        TestdataValue v1 = new TestdataValue("v1");
+        TestdataValue v2 = new TestdataValue("v2");
+        TestdataValue v3 = new TestdataValue("v3");
+        solution.setValueList(Arrays.asList(v1, v2, v3));
+        solution.setEntityList(Collections.emptyList());
+
+        solution = solver.solve(solution);
+        assertNotNull(solution);
+        assertEquals(0, solution.getEntityList().size());
     }
 
     @Test

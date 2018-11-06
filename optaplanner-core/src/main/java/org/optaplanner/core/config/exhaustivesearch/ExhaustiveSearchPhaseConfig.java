@@ -130,8 +130,9 @@ public class ExhaustiveSearchPhaseConfig extends PhaseConfig<ExhaustiveSearchPha
                 : exhaustiveSearchType_.getDefaultEntitySorterManner());
         phaseConfigPolicy.setValueSorterManner(valueSorterManner != null ? valueSorterManner
                 : exhaustiveSearchType_.getDefaultValueSorterManner());
-        DefaultExhaustiveSearchPhase phase = new DefaultExhaustiveSearchPhase();
-        configurePhase(phase, phaseIndex, phaseConfigPolicy, bestSolutionRecaller, solverTermination);
+        DefaultExhaustiveSearchPhase phase = new DefaultExhaustiveSearchPhase(
+                phaseIndex, solverConfigPolicy.getLogIndentation(), bestSolutionRecaller,
+                buildPhaseTermination(phaseConfigPolicy, solverTermination));
         boolean scoreBounderEnabled = exhaustiveSearchType_.isScoreBounderEnabled();
         NodeExplorationType nodeExplorationType_;
         if (exhaustiveSearchType_ == ExhaustiveSearchType.BRUTE_FORCE) {
@@ -171,7 +172,7 @@ public class ExhaustiveSearchPhaseConfig extends PhaseConfig<ExhaustiveSearchPha
             entitySelectorConfig_ = new EntitySelectorConfig();
             EntityDescriptor entityDescriptor = deduceEntityDescriptor(configPolicy.getSolutionDescriptor());
             entitySelectorConfig_.setEntityClass(entityDescriptor.getEntityClass());
-            if (configPolicy.getEntitySorterManner().hasSorter(entityDescriptor)) {
+            if (EntitySelectorConfig.hasSorter(configPolicy.getEntitySorterManner(), entityDescriptor)) {
                 entitySelectorConfig_.setCacheType(SelectionCacheType.PHASE);
                 entitySelectorConfig_.setSelectionOrder(SelectionOrder.SORTED);
                 entitySelectorConfig_.setSorterManner(configPolicy.getEntitySorterManner());
@@ -195,7 +196,7 @@ public class ExhaustiveSearchPhaseConfig extends PhaseConfig<ExhaustiveSearchPha
             throw new IllegalArgumentException("The phaseConfig (" + this
                     + ") has no entitySelector configured"
                     + " and because there are multiple in the entityClassSet (" + solutionDescriptor.getEntityClassSet()
-                    + "), it can not be deducted automatically.");
+                    + "), it can not be deduced automatically.");
         }
         return entityDescriptors.iterator().next();
     }
@@ -213,7 +214,8 @@ public class ExhaustiveSearchPhaseConfig extends PhaseConfig<ExhaustiveSearchPha
                 SelectionCacheType.JUST_IN_TIME, SelectionOrder.ORIGINAL);
         ScoreBounder scoreBounder = scoreBounderEnabled
                 ? new TrendBasedScoreBounder(configPolicy.getScoreDirectorFactory()) : null;
-        ExhaustiveSearchDecider decider = new ExhaustiveSearchDecider(bestSolutionRecaller, termination,
+        ExhaustiveSearchDecider decider = new ExhaustiveSearchDecider(configPolicy.getLogIndentation(),
+                bestSolutionRecaller, termination,
                 manualEntityMimicRecorder, moveSelector, scoreBounderEnabled, scoreBounder);
         EnvironmentMode environmentMode = configPolicy.getEnvironmentMode();
         if (environmentMode.isNonIntrusiveFullAsserted()) {
@@ -237,12 +239,11 @@ public class ExhaustiveSearchPhaseConfig extends PhaseConfig<ExhaustiveSearchPha
                     variableDescriptors.size());
             for (GenuineVariableDescriptor variableDescriptor : variableDescriptors) {
                 ChangeMoveSelectorConfig changeMoveSelectorConfig = new ChangeMoveSelectorConfig();
-                EntitySelectorConfig changeEntitySelectorConfig = new EntitySelectorConfig();
-                changeEntitySelectorConfig.setMimicSelectorRef(mimicSelectorId);
-                changeMoveSelectorConfig.setEntitySelectorConfig(changeEntitySelectorConfig);
+                changeMoveSelectorConfig.setEntitySelectorConfig(
+                        EntitySelectorConfig.newMimicSelectorConfig(mimicSelectorId));
                 ValueSelectorConfig changeValueSelectorConfig = new ValueSelectorConfig();
                 changeValueSelectorConfig.setVariableName(variableDescriptor.getVariableName());
-                if (configPolicy.getValueSorterManner().hasSorter(variableDescriptor)) {
+                if (ValueSelectorConfig.hasSorter(configPolicy.getValueSorterManner(), variableDescriptor)) {
                     if (variableDescriptor.isValueRangeEntityIndependent()) {
                         changeValueSelectorConfig.setCacheType(SelectionCacheType.PHASE);
                     } else {

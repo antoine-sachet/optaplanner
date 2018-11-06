@@ -30,7 +30,6 @@ import java.io.UnsupportedEncodingException;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.benchmark.api.PlannerBenchmark;
 import org.optaplanner.benchmark.api.PlannerBenchmarkFactory;
 import org.optaplanner.benchmark.config.PlannerBenchmarkConfig;
@@ -39,10 +38,7 @@ import org.optaplanner.core.config.SolverConfigContext;
 /**
  * @see PlannerBenchmarkFactory
  */
-public class FreemarkerXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactory {
-
-    protected final SolverConfigContext solverConfigContext;
-    private final XStreamXmlPlannerBenchmarkFactory xmlPlannerBenchmarkFactory;
+public class FreemarkerXmlPlannerBenchmarkFactory extends AbstractPlannerBenchmarkFactory {
 
     public FreemarkerXmlPlannerBenchmarkFactory() {
         this(new SolverConfigContext());
@@ -52,8 +48,7 @@ public class FreemarkerXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactor
      * @param solverConfigContext never null
      */
     public FreemarkerXmlPlannerBenchmarkFactory(SolverConfigContext solverConfigContext) {
-        this.solverConfigContext = solverConfigContext;
-        xmlPlannerBenchmarkFactory = new XStreamXmlPlannerBenchmarkFactory(solverConfigContext);
+        super(solverConfigContext);
     }
 
     // ************************************************************************
@@ -75,34 +70,34 @@ public class FreemarkerXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactor
      */
     public FreemarkerXmlPlannerBenchmarkFactory configure(String templateResource, Object model) {
         ClassLoader actualClassLoader = solverConfigContext.determineActualClassLoader();
-        InputStream templateIn = actualClassLoader.getResourceAsStream(templateResource);
-        if (templateIn == null) {
-            String errorMessage = "The templateResource (" + templateResource
-                    + ") does not exist as a classpath resource in the classLoader (" + actualClassLoader + ").";
-            if (templateResource.startsWith("/")) {
-                errorMessage += "\nAs from 6.1, a classpath resource should not start with a slash (/)."
-                        + " A templateResource now adheres to ClassLoader.getResource(String)."
-                        + " Remove the leading slash from the templateResource if you're upgrading from 6.0.";
+        try (InputStream templateIn = actualClassLoader.getResourceAsStream(templateResource)) {
+            if (templateIn == null) {
+                String errorMessage = "The templateResource (" + templateResource
+                        + ") does not exist as a classpath resource in the classLoader (" + actualClassLoader + ").";
+                if (templateResource.startsWith("/")) {
+                    errorMessage += "\nAs from 6.1, a classpath resource should not start with a slash (/)."
+                            + " A templateResource now adheres to ClassLoader.getResource(String)."
+                            + " Remove the leading slash from the templateResource if you're upgrading from 6.0.";
+                }
+                throw new IllegalArgumentException(errorMessage);
             }
-            throw new IllegalArgumentException(errorMessage);
+            return configure(templateIn, model);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading the templateResource (" + templateResource + ") failed.", e);
         }
-        return configure(templateIn, model);
     }
 
     public FreemarkerXmlPlannerBenchmarkFactory configure(File templateFile) {
-
-        try {
-            return configure(new FileInputStream(templateFile));
-        } catch (FileNotFoundException e) {
-            throw new IllegalArgumentException("The templateFile (" + templateFile + ") was not found.", e);
-        }
+        return configure(templateFile, null);
     }
 
     public FreemarkerXmlPlannerBenchmarkFactory configure(File templateFile, Object model) {
-        try {
-            return configure(new FileInputStream(templateFile), model);
+        try (FileInputStream templateIn = new FileInputStream(templateFile)) {
+            return configure(templateIn, model);
         } catch (FileNotFoundException e) {
             throw new IllegalArgumentException("The templateFile (" + templateFile + ") was not found.", e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading the templateFile (" + templateFile + ") failed.", e);
         }
     }
 
@@ -111,15 +106,12 @@ public class FreemarkerXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactor
     }
 
     public FreemarkerXmlPlannerBenchmarkFactory configure(InputStream templateIn, Object model) {
-        Reader reader = null;
-        try {
-            reader = new InputStreamReader(templateIn, "UTF-8");
+        try (Reader reader = new InputStreamReader(templateIn, "UTF-8")) {
             return configure(reader, model);
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException("This vm does not support UTF-8 encoding.", e);
-        } finally {
-            IOUtils.closeQuietly(reader);
-            IOUtils.closeQuietly(templateIn);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading failed.", e);
         }
     }
 
@@ -153,33 +145,22 @@ public class FreemarkerXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactor
     }
 
     public FreemarkerXmlPlannerBenchmarkFactory configure(Template template, Object model) {
-        StringWriter configWriter = new StringWriter();
-        try {
+        String content;
+        try (StringWriter configWriter = new StringWriter()) {
             template.process(model, configWriter);
+            content = configWriter.toString();
         } catch (IOException e) {
             throw new IllegalArgumentException("Can not write to configWriter.", e);
         } catch (TemplateException e) {
             throw new IllegalArgumentException("Can not process Freemarker template to configWriter.", e);
-        } finally {
-            IOUtils.closeQuietly(configWriter);
         }
-        StringReader configReader = new StringReader(configWriter.toString());
-        xmlPlannerBenchmarkFactory.configure(configReader);
+        XStreamXmlPlannerBenchmarkFactory xmlPlannerBenchmarkFactory = new XStreamXmlPlannerBenchmarkFactory(
+                solverConfigContext);
+        try (StringReader configReader = new StringReader(content)) {
+            xmlPlannerBenchmarkFactory.configure(configReader);
+        }
+        plannerBenchmarkConfig = xmlPlannerBenchmarkFactory.getPlannerBenchmarkConfig();
         return this;
-    }
-
-    // ************************************************************************
-    // Worker methods
-    // ************************************************************************
-
-    @Override
-    public PlannerBenchmarkConfig getPlannerBenchmarkConfig() {
-        return xmlPlannerBenchmarkFactory.getPlannerBenchmarkConfig();
-    }
-
-    @Override
-    public PlannerBenchmark buildPlannerBenchmark() {
-        return xmlPlannerBenchmarkFactory.buildPlannerBenchmark();
     }
 
 }

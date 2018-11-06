@@ -16,38 +16,80 @@
 
 package org.optaplanner.core.api.score.holder;
 
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
+import org.drools.core.beliefsystem.ModedAssertion;
 import org.drools.core.common.AgendaItem;
 import org.drools.core.common.AgendaItemImpl;
 import org.kie.api.definition.rule.Rule;
 import org.kie.api.runtime.rule.RuleContext;
-import org.kie.api.runtime.rule.RuleRuntime;
+import org.optaplanner.core.api.score.constraint.ConstraintMatchTotal;
 
 import static org.mockito.Mockito.*;
 
 public abstract class AbstractScoreHolderTest {
 
-    protected RuleContext mockRuleContext(String ruleName) {
+    protected final static Object DEFAULT_JUSTIFICATION = new Object();
+    protected final static Object OTHER_JUSTIFICATION = new Object();
+    protected final static Object UNDO_JUSTIFICATION = new Object();
+
+    private static interface TestModedAssertion extends ModedAssertion<TestModedAssertion> {
+    }
+
+    protected RuleContext mockRuleContext(String ruleName, Object... justifications) {
+        Rule rule = mockRule(ruleName);
+        return mockRuleContext(rule, justifications);
+    }
+
+    protected RuleContext mockRuleContext(Rule rule, Object... justifications) {
+        if (justifications.length == 0) {
+            justifications = new Object[]{DEFAULT_JUSTIFICATION};
+        }
+        List<Object> justificationList = Arrays.asList(justifications);
         RuleContext kcontext = mock(RuleContext.class);
-        AgendaItem agendaItem = new AgendaItemImpl() {
+        AgendaItemImpl<TestModedAssertion> agendaItem = new AgendaItemImpl<TestModedAssertion>() {
+
             @Override
             public List<Object> getObjects() {
-                return Collections.emptyList();
+                return justificationList;
             }
+
+            @Override
+            public List<Object> getObjectsDeep() {
+                return justificationList;
+            }
+
         };
         when(kcontext.getMatch()).thenReturn(agendaItem);
-        Rule rule = mock(Rule.class);
-        when(rule.getPackageName()).thenReturn(getClass().getPackage().getName());
-        when(rule.getName()).thenReturn(ruleName);
         when(kcontext.getRule()).thenReturn(rule);
         return kcontext;
     }
 
-    protected void callUnMatch(RuleContext ruleContext) {
-        AgendaItem agendaItem = (AgendaItem) ruleContext.getMatch();
-        agendaItem.getActivationUnMatchListener().unMatch(mock(RuleRuntime.class), agendaItem);
+    protected Rule mockRule(String ruleName) {
+        Rule rule = mock(Rule.class);
+        when(rule.getPackageName()).thenReturn(getClass().getPackage().getName());
+        when(rule.getName()).thenReturn(ruleName);
+        return rule;
+    }
+
+    protected void callOnUpdate(RuleContext ruleContext) {
+        AgendaItem<?> agendaItem = (AgendaItem) ruleContext.getMatch();
+        agendaItem.getCallback().run();
+    }
+
+    protected void callOnDelete(RuleContext ruleContext) {
+        AgendaItem<?> agendaItem = (AgendaItem) ruleContext.getMatch();
+        agendaItem.getCallback().run();
+    }
+
+    protected ConstraintMatchTotal findConstraintMatchTotal(ScoreHolder scoreHolder, String ruleName) {
+        Collection<ConstraintMatchTotal> constraintMatchTotals = scoreHolder.getConstraintMatchTotals();
+        Optional<ConstraintMatchTotal> first = constraintMatchTotals.stream()
+                .filter(constraintMatchTotal -> constraintMatchTotal.getConstraintName().equals(ruleName)).findFirst();
+        return first.orElse(null);
     }
 
 }

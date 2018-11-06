@@ -35,6 +35,7 @@ import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.config.solver.EnvironmentMode;
 import org.optaplanner.core.config.solver.SolverConfig;
+import org.optaplanner.core.impl.score.definition.ScoreDefinition;
 import org.optaplanner.core.impl.solver.XStreamXmlSolverFactory;
 
 /**
@@ -51,6 +52,8 @@ public class SolverBenchmarkResult {
     private Integer subSingleCount = null;
 
     private SolverConfig solverConfig = null;
+    @XStreamOmitField // Restored through BenchmarkResultIO
+    private ScoreDefinition scoreDefinition = null;
 
     @XStreamImplicit(itemFieldName = "singleBenchmarkResult")
     private List<SingleBenchmarkResult> singleBenchmarkResultList = null;
@@ -73,9 +76,14 @@ public class SolverBenchmarkResult {
     // The average of the average is not just the overall average if the SingleBenchmarkResult's timeMillisSpent differ
     private Long averageScoreCalculationSpeed = null;
     private Long averageTimeMillisSpent = null;
+    private Double averageWorstScoreCalculationSpeedDifferencePercentage = null;
 
     // Ranking starts from 0
     private Integer ranking = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public SolverBenchmarkResult(PlannerBenchmarkResult plannerBenchmarkResult) {
         this.plannerBenchmarkResult = plannerBenchmarkResult;
@@ -114,6 +122,14 @@ public class SolverBenchmarkResult {
 
     public void setSolverConfig(SolverConfig solverConfig) {
         this.solverConfig = solverConfig;
+    }
+
+    public ScoreDefinition getScoreDefinition() {
+        return scoreDefinition;
+    }
+
+    public void setScoreDefinition(ScoreDefinition scoreDefinition) {
+        this.scoreDefinition = scoreDefinition;
     }
 
     public List<SingleBenchmarkResult> getSingleBenchmarkResultList() {
@@ -158,6 +174,10 @@ public class SolverBenchmarkResult {
 
     public Long getAverageTimeMillisSpent() {
         return averageTimeMillisSpent;
+    }
+
+    public Double getAverageWorstScoreCalculationSpeedDifferencePercentage() {
+        return averageWorstScoreCalculationSpeedDifferencePercentage;
     }
 
     public Integer getRanking() {
@@ -240,7 +260,7 @@ public class SolverBenchmarkResult {
         XStream xStream = XStreamXmlSolverFactory.buildXStream();
         xStream.setMode(XStream.NO_REFERENCES);
         String xml = xStream.toXML(solverConfig);
-        return StringEscapeUtils.ESCAPE_HTML4.translate(xml);
+        return StringEscapeUtils.escapeHtml4(xml);
     }
 
     public EnvironmentMode getEnvironmentMode() {
@@ -274,6 +294,7 @@ public class SolverBenchmarkResult {
         ScoreDifferencePercentage totalWorstScoreDifferencePercentage = null;
         long totalScoreCalculationSpeed = 0L;
         long totalTimeMillisSpent = 0L;
+        double totalWorstScoreCalculationSpeedDifferencePercentage = 0.0;
         uninitializedSolutionCount = 0;
         infeasibleScoreCount = 0;
         for (SingleBenchmarkResult singleBenchmarkResult : singleBenchmarkResultList) {
@@ -291,6 +312,7 @@ public class SolverBenchmarkResult {
                     totalWorstScoreDifferencePercentage = singleBenchmarkResult.getWorstScoreDifferencePercentage();
                     totalScoreCalculationSpeed = singleBenchmarkResult.getScoreCalculationSpeed();
                     totalTimeMillisSpent = singleBenchmarkResult.getTimeMillisSpent();
+                    totalWorstScoreCalculationSpeedDifferencePercentage = singleBenchmarkResult.getWorstScoreCalculationSpeedDifferencePercentage();
                     firstNonFailure = false;
                 } else {
                     totalScore = totalScore.add(singleBenchmarkResult.getAverageScore());
@@ -300,6 +322,7 @@ public class SolverBenchmarkResult {
                             singleBenchmarkResult.getWorstScoreDifferencePercentage());
                     totalScoreCalculationSpeed += singleBenchmarkResult.getScoreCalculationSpeed();
                     totalTimeMillisSpent += singleBenchmarkResult.getTimeMillisSpent();
+                    totalWorstScoreCalculationSpeedDifferencePercentage += singleBenchmarkResult.getWorstScoreCalculationSpeedDifferencePercentage();
                 }
             }
         }
@@ -309,6 +332,7 @@ public class SolverBenchmarkResult {
             averageWorstScoreDifferencePercentage = totalWorstScoreDifferencePercentage.divide((double) successCount);
             averageScoreCalculationSpeed = totalScoreCalculationSpeed / (long) successCount;
             averageTimeMillisSpent = totalTimeMillisSpent / (long) successCount;
+            averageWorstScoreCalculationSpeedDifferencePercentage = totalWorstScoreCalculationSpeedDifferencePercentage / ((double) successCount);
         }
     }
 
@@ -335,6 +359,7 @@ public class SolverBenchmarkResult {
                 nameCountMap.put(oldResult.name, nameCount);
                 newResult.subSingleCount = oldResult.subSingleCount;
                 newResult.solverConfig = oldResult.solverConfig;
+                newResult.scoreDefinition = oldResult.scoreDefinition;
                 newResult.singleBenchmarkResultList = new ArrayList<>(
                         oldResult.singleBenchmarkResultList.size());
                 mergeMap.put(oldResult, newResult);

@@ -30,17 +30,15 @@ import org.optaplanner.core.config.heuristic.selector.move.generic.ChangeMoveSel
 import org.optaplanner.core.config.localsearch.LocalSearchPhaseConfig;
 import org.optaplanner.core.config.localsearch.decider.acceptor.AcceptorConfig;
 import org.optaplanner.core.config.phase.PhaseConfig;
-import org.optaplanner.core.config.score.definition.ScoreDefinitionType;
 import org.optaplanner.core.config.score.director.ScoreDirectorFactoryConfig;
 import org.optaplanner.core.config.solver.SolverConfig;
 import org.optaplanner.core.config.solver.termination.TerminationConfig;
 import org.optaplanner.examples.common.app.CommonApp;
-import org.optaplanner.examples.common.persistence.SolutionDao;
-import org.optaplanner.examples.common.swingui.SolutionPanel;
 import org.optaplanner.examples.nqueens.domain.NQueens;
 import org.optaplanner.examples.nqueens.domain.Queen;
-import org.optaplanner.examples.nqueens.persistence.NQueensDao;
 import org.optaplanner.examples.nqueens.swingui.NQueensPanel;
+import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
+import org.optaplanner.persistence.xstream.impl.domain.solution.XStreamSolutionFileIO;
 
 /**
  * For an easy example, look at {@link NQueensHelloWorld} instead.
@@ -49,6 +47,8 @@ public class NQueensApp extends CommonApp<NQueens> {
 
     public static final String SOLVER_CONFIG
             = "org/optaplanner/examples/nqueens/solver/nqueensSolverConfig.xml";
+
+    public static final String DATA_DIR_NAME = "nqueens";
 
     public static void main(String[] args) {
         prepareSwingEnvironment();
@@ -59,7 +59,7 @@ public class NQueensApp extends CommonApp<NQueens> {
         super("N queens",
                 "Place queens on a chessboard.\n\n" +
                         "No 2 queens must be able to attack each other.",
-                SOLVER_CONFIG,
+                SOLVER_CONFIG, DATA_DIR_NAME,
                 NQueensPanel.LOGO_PATH);
     }
 
@@ -91,14 +91,11 @@ public class NQueensApp extends CommonApp<NQueens> {
         solverConfig.setEntityClassList(Collections.<Class<?>>singletonList(Queen.class));
 
         ScoreDirectorFactoryConfig scoreDirectorFactoryConfig = new ScoreDirectorFactoryConfig();
-        scoreDirectorFactoryConfig.setScoreDefinitionType(ScoreDefinitionType.SIMPLE);
         scoreDirectorFactoryConfig.setScoreDrlList(
                 Arrays.asList("org/optaplanner/examples/nqueens/solver/nQueensScoreRules.drl"));
         solverConfig.setScoreDirectorFactoryConfig(scoreDirectorFactoryConfig);
 
-        TerminationConfig terminationConfig = new TerminationConfig();
-        terminationConfig.setBestScoreLimit("0");
-        solverConfig.setTerminationConfig(terminationConfig);
+        solverConfig.setTerminationConfig(new TerminationConfig().withBestScoreLimit("0"));
         List<PhaseConfig> phaseConfigList = new ArrayList<>();
 
         ConstructionHeuristicPhaseConfig constructionHeuristicPhaseConfig = new ConstructionHeuristicPhaseConfig();
@@ -110,9 +107,7 @@ public class NQueensApp extends CommonApp<NQueens> {
         ChangeMoveSelectorConfig changeMoveSelectorConfig = new ChangeMoveSelectorConfig();
         changeMoveSelectorConfig.setSelectionOrder(SelectionOrder.ORIGINAL);
         localSearchPhaseConfig.setMoveSelectorConfig(changeMoveSelectorConfig);
-        AcceptorConfig acceptorConfig = new AcceptorConfig();
-        acceptorConfig.setEntityTabuSize(5);
-        localSearchPhaseConfig.setAcceptorConfig(acceptorConfig);
+        localSearchPhaseConfig.setAcceptorConfig(new AcceptorConfig().withEntityTabuSize(5));
         phaseConfigList.add(localSearchPhaseConfig);
 
         solverConfig.setPhaseConfigList(phaseConfigList);
@@ -120,13 +115,13 @@ public class NQueensApp extends CommonApp<NQueens> {
     }
 
     @Override
-    protected SolutionPanel createSolutionPanel() {
+    protected NQueensPanel createSolutionPanel() {
         return new NQueensPanel();
     }
 
     @Override
-    protected SolutionDao createSolutionDao() {
-        return new NQueensDao();
+    public SolutionFileIO<NQueens> createSolutionFileIO() {
+        return new XStreamSolutionFileIO<>(NQueens.class);
     }
 
 }

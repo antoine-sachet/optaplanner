@@ -18,11 +18,9 @@ package org.optaplanner.core.impl.domain.valuerange.buildin.primboolean;
 
 import java.util.Random;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.anyInt;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.*;
 import static org.optaplanner.core.impl.testdata.util.PlannerAssert.*;
 
@@ -43,6 +41,7 @@ public class BooleanValueRangeTest {
     public void contains() {
         assertEquals(true, new BooleanValueRange().contains(Boolean.FALSE));
         assertEquals(true, new BooleanValueRange().contains(Boolean.TRUE));
+        assertEquals(false, new BooleanValueRange().contains(null));
     }
 
     @Test
@@ -57,6 +56,16 @@ public class BooleanValueRangeTest {
         when(workingRandom.nextBoolean()).thenReturn(true, true, false, true);
         assertElementsOfIterator(new BooleanValueRange().createRandomIterator(workingRandom),
                 Boolean.TRUE, Boolean.TRUE, Boolean.FALSE, Boolean.TRUE);
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void getIndexNegative() {
+        new BooleanValueRange().get(-1);
+    }
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void getIndexGreaterThanSize() {
+        new BooleanValueRange().get(2);
     }
 
 }

@@ -16,9 +16,11 @@
 
 package org.optaplanner.benchmark.impl;
 
+import java.awt.Desktop;
 import java.io.File;
+import java.io.IOException;
+import java.time.OffsetDateTime;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +29,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.optaplanner.benchmark.api.PlannerBenchmark;
@@ -56,25 +57,29 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
     private final PlannerBenchmarkResult plannerBenchmarkResult;
     private final SolverConfigContext solverConfigContext;
 
-    private File benchmarkDirectory = null;
-    private BenchmarkReport benchmarkReport = null;
-
-    private ExecutorService warmUpExecutorService;
-    private ExecutorCompletionService<SubSingleBenchmarkRunner> warmUpExecutorCompletionService;
-    private ExecutorService executorService;
-    private BenchmarkResultIO benchmarkResultIO;
+    private final File benchmarkDirectory;
+    private final ExecutorService warmUpExecutorService;
+    private final ExecutorCompletionService<SubSingleBenchmarkRunner> warmUpExecutorCompletionService;
+    private final ExecutorService executorService;
+    private final BenchmarkResultIO benchmarkResultIO;
+    private final BenchmarkReport benchmarkReport;
 
     private long startingSystemTimeMillis = -1L;
     private SubSingleBenchmarkRunner firstFailureSubSingleBenchmarkRunner = null;
 
-    public DefaultPlannerBenchmark(PlannerBenchmarkResult plannerBenchmarkResult) {
-        this(plannerBenchmarkResult, new SolverConfigContext());
-    }
-
-    public DefaultPlannerBenchmark(PlannerBenchmarkResult plannerBenchmarkResult,
-            SolverConfigContext solverConfigContext) {
+    public DefaultPlannerBenchmark(
+            PlannerBenchmarkResult plannerBenchmarkResult, SolverConfigContext solverConfigContext,
+            File benchmarkDirectory,
+            ExecutorService warmUpExecutorService, ExecutorService executorService,
+            BenchmarkReport benchmarkReport) {
         this.plannerBenchmarkResult = plannerBenchmarkResult;
         this.solverConfigContext = solverConfigContext;
+        this.benchmarkDirectory = benchmarkDirectory;
+        this.warmUpExecutorService = warmUpExecutorService;
+        warmUpExecutorCompletionService = new ExecutorCompletionService<>(warmUpExecutorService);
+        this.executorService = executorService;
+        this.benchmarkReport = benchmarkReport;
+        benchmarkResultIO = new BenchmarkResultIO();
     }
 
     public PlannerBenchmarkResult getPlannerBenchmarkResult() {
@@ -85,16 +90,8 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
         return benchmarkDirectory;
     }
 
-    public void setBenchmarkDirectory(File benchmarkDirectory) {
-        this.benchmarkDirectory = benchmarkDirectory;
-    }
-
     public BenchmarkReport getBenchmarkReport() {
         return benchmarkReport;
-    }
-
-    public void setBenchmarkReport(BenchmarkReport benchmarkReport) {
-        this.benchmarkReport = benchmarkReport;
     }
 
     // ************************************************************************
@@ -114,18 +111,14 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
             throw new IllegalStateException("This benchmark has already ran before.");
         }
         startingSystemTimeMillis = System.currentTimeMillis();
-        plannerBenchmarkResult.setStartingTimestamp(new Date());
+        plannerBenchmarkResult.setStartingTimestamp(OffsetDateTime.now());
         List<SolverBenchmarkResult> solverBenchmarkResultList = plannerBenchmarkResult.getSolverBenchmarkResultList();
         if (ConfigUtils.isEmptyCollection(solverBenchmarkResultList)) {
             throw new IllegalArgumentException(
                     "The solverBenchmarkResultList (" + solverBenchmarkResultList + ") cannot be empty.");
         }
-        initBenchmarkDirectoryAndSubdirs();
+        initBenchmarkDirectoryAndSubdirectories();
         plannerBenchmarkResult.initSystemProperties();
-        warmUpExecutorService = Executors.newFixedThreadPool(plannerBenchmarkResult.getParallelBenchmarkCount());
-        warmUpExecutorCompletionService = new ExecutorCompletionService<>(warmUpExecutorService);
-        executorService = Executors.newFixedThreadPool(plannerBenchmarkResult.getParallelBenchmarkCount());
-        benchmarkResultIO = new BenchmarkResultIO();
         logger.info("Benchmarking started: parallelBenchmarkCount ({})"
                 + " for problemCount ({}), solverCount ({}), totalSubSingleCount ({}).",
                 plannerBenchmarkResult.getParallelBenchmarkCount(),
@@ -134,7 +127,7 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
                 plannerBenchmarkResult.getTotalSubSingleCount());
     }
 
-    private void initBenchmarkDirectoryAndSubdirs() {
+    private void initBenchmarkDirectoryAndSubdirectories() {
         if (benchmarkDirectory == null) {
             throw new IllegalArgumentException("The benchmarkDirectory (" + benchmarkDirectory + ") must not be null.");
         }
@@ -154,7 +147,7 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
         int parallelBenchmarkCount = plannerBenchmarkResult.getParallelBenchmarkCount();
         int solverBenchmarkResultCount = plannerBenchmarkResult.getSolverBenchmarkResultList().size();
         int cyclesCount = ConfigUtils.ceilDivide(solverBenchmarkResultCount, parallelBenchmarkCount);
-        long timeLeftPerCycle = ConfigUtils.floorDivide(timeLeftTotal, cyclesCount);
+        long timeLeftPerCycle = Math.floorDiv(timeLeftTotal, cyclesCount);
         Map<ProblemBenchmarkResult, List<ProblemStatistic>> originalProblemStatisticMap
                 = new HashMap<>(plannerBenchmarkResult.getUnifiedProblemBenchmarkResultList().size());
         ConcurrentMap<SolverBenchmarkResult, Integer> singleBenchmarkResultIndexMap
@@ -204,7 +197,7 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
                     = solverBenchmarkResult.getSingleBenchmarkResultList().get(singleBenchmarkResultIndex);
             // Just take the first subSingle, we don't need to warm up each one
             SubSingleBenchmarkRunner subSingleBenchmarkRunner = new SubSingleBenchmarkRunner(
-                    singleBenchmarkResult.getSubSingleBenchmarkResultList().get(0), solverConfigContext);
+                    singleBenchmarkResult.getSubSingleBenchmarkResultList().get(0), true, solverConfigContext);
             Future<SubSingleBenchmarkRunner> future = warmUpExecutorCompletionService.submit(subSingleBenchmarkRunner);
             futureMap.put(future, subSingleBenchmarkRunner);
             singleBenchmarkResultIndexMap.put(solverBenchmarkResult, singleBenchmarkResultIndex + 1);
@@ -266,7 +259,7 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
             for (SingleBenchmarkResult singleBenchmarkResult : problemBenchmarkResult.getSingleBenchmarkResultList()) {
                 for (SubSingleBenchmarkResult subSingleBenchmarkResult : singleBenchmarkResult.getSubSingleBenchmarkResultList()) {
                     SubSingleBenchmarkRunner subSingleBenchmarkRunner = new SubSingleBenchmarkRunner(
-                            subSingleBenchmarkResult, solverConfigContext);
+                            subSingleBenchmarkResult, false, solverConfigContext);
                     Future<SubSingleBenchmarkRunner> future = executorService.submit(subSingleBenchmarkRunner);
                     futureMap.put(subSingleBenchmarkRunner, future);
                 }
@@ -280,10 +273,6 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
             try {
                 // Explicitly returning it in the Callable guarantees memory visibility
                 subSingleBenchmarkRunner = future.get();
-                // TODO WORKAROUND Remove when PLANNER-46 is fixed.
-                if (subSingleBenchmarkRunner.getSubSingleBenchmarkResult().getAverageScore() == null) {
-                    throw new IllegalStateException("Score is null. TODO fix PLANNER-46.");
-                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 singleBenchmarkRunnerExceptionLogger.error("The subSingleBenchmarkRunner ({}) was interrupted.",
@@ -294,11 +283,6 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
                 singleBenchmarkRunnerExceptionLogger.warn("The subSingleBenchmarkRunner ({}) failed.",
                         subSingleBenchmarkRunner, cause);
                 failureThrowable = cause;
-            } catch (IllegalStateException e) {
-                // TODO WORKAROUND Remove when PLANNER-46 is fixed.
-                singleBenchmarkRunnerExceptionLogger.warn("The subSingleBenchmarkRunner ({}) failed.",
-                        subSingleBenchmarkRunner, e);
-                failureThrowable = e;
             }
             if (failureThrowable == null) {
                 subSingleBenchmarkRunner.getSubSingleBenchmarkResult().setSucceeded(true);
@@ -400,9 +384,9 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
                     }
                     ProblemBenchmarkResult problemBenchmarkResult = singleBenchmarkResult.getProblemBenchmarkResult();
                     originalProblemStatisticMap.putIfAbsent(problemBenchmarkResult, problemBenchmarkResult.getProblemStatisticList());
-                    singleBenchmarkResult.getProblemBenchmarkResult().setProblemStatisticList(Collections.<ProblemStatistic>emptyList());
+                    singleBenchmarkResult.getProblemBenchmarkResult().setProblemStatisticList(Collections.emptyList());
                     for (SubSingleBenchmarkResult subSingleBenchmarkResult : singleBenchmarkResult.getSubSingleBenchmarkResultList()) { // needs to happen after all problem stats
-                        subSingleBenchmarkResult.setPureSubSingleStatisticList(Collections.<PureSubSingleStatistic>emptyList());
+                        subSingleBenchmarkResult.setPureSubSingleStatisticList(Collections.emptyList());
                         subSingleBenchmarkResult.initSubSingleStatisticMap();
                     }
                 }
@@ -413,6 +397,27 @@ public class DefaultPlannerBenchmark implements PlannerBenchmark {
                 }
             }
             return warmUpConfigBackupMap;
+        }
+    }
+
+    @Override
+    public void benchmarkAndShowReportInBrowser() {
+        benchmark();
+        showReportInBrowser();
+    }
+
+    private void showReportInBrowser() {
+        File htmlOverviewFile = benchmarkReport.getHtmlOverviewFile();
+        Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
+        if (desktop == null || !desktop.isSupported(Desktop.Action.BROWSE)) {
+            logger.warn("The default browser can't be opened to show htmlOverviewFile ({}).", htmlOverviewFile);
+            return;
+        }
+        try {
+            desktop.browse(htmlOverviewFile.getAbsoluteFile().toURI());
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed showing htmlOverviewFile (" + htmlOverviewFile
+                    + ") in the default browser.", e);
         }
     }
 

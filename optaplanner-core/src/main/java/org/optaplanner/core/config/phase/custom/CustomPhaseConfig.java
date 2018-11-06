@@ -17,7 +17,6 @@
 package org.optaplanner.core.config.phase.custom;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -44,9 +43,13 @@ public class CustomPhaseConfig extends PhaseConfig<CustomPhaseConfig> {
     @XStreamImplicit(itemFieldName = "customPhaseCommandClass")
     protected List<Class<? extends CustomPhaseCommand>> customPhaseCommandClassList = null;
 
-    @XStreamConverter(value = KeyAsElementMapConverter.class)
+    @XStreamConverter(KeyAsElementMapConverter.class)
     protected Map<String, String> customProperties = null;
     protected Boolean forceUpdateBestSolution = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public List<Class<? extends CustomPhaseCommand>> getCustomPhaseCommandClassList() {
         return customPhaseCommandClassList;
@@ -80,28 +83,28 @@ public class CustomPhaseConfig extends PhaseConfig<CustomPhaseConfig> {
     public CustomPhase buildPhase(int phaseIndex, HeuristicConfigPolicy solverConfigPolicy,
             BestSolutionRecaller bestSolutionRecaller, Termination solverTermination) {
         HeuristicConfigPolicy phaseConfigPolicy = solverConfigPolicy.createPhaseConfigPolicy();
-        DefaultCustomPhase customPhase = new DefaultCustomPhase();
-        configurePhase(customPhase, phaseIndex, phaseConfigPolicy, bestSolutionRecaller, solverTermination);
+        DefaultCustomPhase phase = new DefaultCustomPhase(
+                phaseIndex, solverConfigPolicy.getLogIndentation(), bestSolutionRecaller,
+                buildPhaseTermination(phaseConfigPolicy, solverTermination));
         if (ConfigUtils.isEmptyCollection(customPhaseCommandClassList)) {
             throw new IllegalArgumentException(
                     "Configure at least 1 <customPhaseCommandClass> in the <customPhase> configuration.");
         }
         List<CustomPhaseCommand> customPhaseCommandList = new ArrayList<>(customPhaseCommandClassList.size());
-        Map<String, String> customProperties_ = customProperties != null ? customProperties
-                : Collections.<String, String>emptyMap();
         for (Class<? extends CustomPhaseCommand> customPhaseCommandClass : customPhaseCommandClassList) {
             CustomPhaseCommand customPhaseCommand = ConfigUtils.newInstance(this,
                     "customPhaseCommandClass", customPhaseCommandClass);
-            customPhaseCommand.applyCustomProperties(customProperties_);
+            ConfigUtils.applyCustomProperties(customPhaseCommand, "customPhaseCommandClass",
+                    customProperties, "customProperties");
             customPhaseCommandList.add(customPhaseCommand);
         }
-        customPhase.setCustomPhaseCommandList(customPhaseCommandList);
-        customPhase.setForceUpdateBestSolution(forceUpdateBestSolution == null ? false : forceUpdateBestSolution);
+        phase.setCustomPhaseCommandList(customPhaseCommandList);
+        phase.setForceUpdateBestSolution(forceUpdateBestSolution == null ? false : forceUpdateBestSolution);
         EnvironmentMode environmentMode = phaseConfigPolicy.getEnvironmentMode();
         if (environmentMode.isNonIntrusiveFullAsserted()) {
-            customPhase.setAssertStepScoreFromScratch(true);
+            phase.setAssertStepScoreFromScratch(true);
         }
-        return customPhase;
+        return phase;
     }
 
     @Override

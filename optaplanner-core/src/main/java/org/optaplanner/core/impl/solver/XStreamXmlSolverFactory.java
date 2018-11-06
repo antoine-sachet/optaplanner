@@ -19,14 +19,15 @@ package org.optaplanner.core.impl.solver;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
+import java.util.Objects;
 
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.converters.ConversionException;
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.api.solver.SolverFactory;
@@ -52,6 +53,8 @@ public class XStreamXmlSolverFactory<Solution_> extends AbstractSolverFactory<So
         xStream.aliasSystemAttribute("xStreamId", "id");
         xStream.aliasSystemAttribute("xStreamRef", "reference");
         xStream.processAnnotations(SolverConfig.class);
+        XStream.setupDefaultSecurity(xStream);
+        xStream.allowTypesByRegExp(new String[]{"org\\.optaplanner\\.\\w+\\.config\\..*"});
         return xStream;
     }
 
@@ -79,8 +82,9 @@ public class XStreamXmlSolverFactory<Solution_> extends AbstractSolverFactory<So
      * @param xStreamAnnotations never null
      * @see XStream#processAnnotations(Class[])
      */
-    public void addXStreamAnnotations(Class... xStreamAnnotations) {
+    public void addXStreamAnnotations(Class<?>... xStreamAnnotations) {
         xStream.processAnnotations(xStreamAnnotations);
+        xStream.allowTypes(xStreamAnnotations);
     }
 
     public XStream getXStream() {
@@ -98,43 +102,47 @@ public class XStreamXmlSolverFactory<Solution_> extends AbstractSolverFactory<So
      */
     public XStreamXmlSolverFactory<Solution_> configure(String solverConfigResource) {
         ClassLoader actualClassLoader = solverConfigContext.determineActualClassLoader();
-        InputStream in = actualClassLoader.getResourceAsStream(solverConfigResource);
-        if (in == null) {
-            String errorMessage = "The solverConfigResource (" + solverConfigResource
-                    + ") does not exist as a classpath resource in the classLoader (" + actualClassLoader + ").";
-            if (solverConfigResource.startsWith("/")) {
-                errorMessage += "\nAs from 6.1, a classpath resource should not start with a slash (/)."
-                        + " A solverConfigResource now adheres to ClassLoader.getResource(String)."
-                        + " Remove the leading slash from the solverConfigResource if you're upgrading from 6.0.";
+        try (InputStream in = actualClassLoader.getResourceAsStream(solverConfigResource)) {
+            if (in == null) {
+                String errorMessage = "The solverConfigResource (" + solverConfigResource
+                        + ") does not exist as a classpath resource in the classLoader (" + actualClassLoader + ").";
+                if (solverConfigResource.startsWith("/")) {
+                    errorMessage += "\nAs from 6.1, a classpath resource should not start with a slash (/)."
+                            + " A solverConfigResource now adheres to ClassLoader.getResource(String)."
+                            + " Remove the leading slash from the solverConfigResource if you're upgrading from 6.0.";
+                }
+                throw new IllegalArgumentException(errorMessage);
             }
-            throw new IllegalArgumentException(errorMessage);
-        }
-        try {
             return configure(in);
         } catch (ConversionException e) {
+            String lineNumber = e.get("line number");
             throw new IllegalArgumentException("Unmarshalling of solverConfigResource (" + solverConfigResource
-                    + ") fails.", e);
+                    + ") fails on line number (" + lineNumber + ")."
+                    + (Objects.equals(e.get("required-type"), "java.lang.Class")
+                    ? "\n  Maybe the classname on line number (" + lineNumber + ") is surrounded by whitespace, which is invalid."
+                    : ""), e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading the solverConfigResource (" + solverConfigResource + ") failed.", e);
         }
     }
 
     public XStreamXmlSolverFactory<Solution_> configure(File solverConfigFile) {
-        try {
-            return configure(new FileInputStream(solverConfigFile));
+        try (InputStream in = new FileInputStream(solverConfigFile)) {
+            return configure(in);
         } catch (FileNotFoundException e) {
             throw new IllegalArgumentException("The solverConfigFile (" + solverConfigFile + ") was not found.", e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading the solverConfigFile (" + solverConfigFile + ") failed.", e);
         }
     }
 
     public XStreamXmlSolverFactory<Solution_> configure(InputStream in) {
-        Reader reader = null;
-        try {
-            reader = new InputStreamReader(in, "UTF-8");
+        try (Reader reader = new InputStreamReader(in, "UTF-8")) {
             return configure(reader);
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException("This vm does not support UTF-8 encoding.", e);
-        } finally {
-            IOUtils.closeQuietly(reader);
-            IOUtils.closeQuietly(in);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading failed.", e);
         }
     }
 

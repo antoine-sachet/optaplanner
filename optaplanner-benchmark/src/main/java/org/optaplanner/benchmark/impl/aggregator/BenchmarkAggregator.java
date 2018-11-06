@@ -17,7 +17,7 @@
 package org.optaplanner.benchmark.impl.aggregator;
 
 import java.io.File;
-import java.util.Date;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -78,7 +78,7 @@ public class BenchmarkAggregator {
             throw new IllegalArgumentException("The singleBenchmarkResultList (" + singleBenchmarkResultList
                     + ") must not be empty.");
         }
-        Date startingTimestamp = new Date();
+        OffsetDateTime startingTimestamp = OffsetDateTime.now();
         for (SingleBenchmarkResult singleBenchmarkResult : singleBenchmarkResultList) {
             for (SubSingleBenchmarkResult subSingleBenchmarkResult : singleBenchmarkResult.getSubSingleBenchmarkResultList()) {
                 subSingleBenchmarkResult.setSingleBenchmarkResult(singleBenchmarkResult);
@@ -97,7 +97,8 @@ public class BenchmarkAggregator {
             }
         }
 
-        PlannerBenchmarkResult plannerBenchmarkResult = PlannerBenchmarkResult.createMergedResult(singleBenchmarkResultList);
+        PlannerBenchmarkResult plannerBenchmarkResult = PlannerBenchmarkResult.createMergedResult(
+                singleBenchmarkResultList);
         plannerBenchmarkResult.setStartingTimestamp(startingTimestamp);
         plannerBenchmarkResult.initBenchmarkReportDirectory(benchmarkDirectory);
 

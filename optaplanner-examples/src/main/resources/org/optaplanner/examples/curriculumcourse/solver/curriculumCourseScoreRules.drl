@@ -38,7 +38,7 @@ global HardSoftScoreHolder scoreHolder;
 // ############################################################################
 
 // Lectures: A missing or extra lecture of a course.
-// This hard constraint is build-in: the correct number of Lecture's is created
+// This hard constraint is built-in: the correct number of Lecture's is created
 
 // Conflicts: Two conflicting lectures in the same period.
 // Three conflicting lectures count as 3 violations: one for each pair.
@@ -100,10 +100,11 @@ end
 rule "minimumWorkingDays"
     when
         $course : Course($minWorkingDaySize : minWorkingDaySize)
-        $dayCount : Long(this < $minWorkingDaySize) from accumulate(
+        accumulate(
             $day : Day()
-            and exists Lecture(course == $course, day == $day),
-            count($day)
+            and exists Lecture(course == $course, day == $day);
+            $dayCount : count($day);
+            $dayCount < $minWorkingDaySize
         )
         // An uninitialized schedule should have no constraints broken
         exists Lecture(course == $course, period != null)
@@ -138,10 +139,11 @@ end
 rule "roomStability"
     when
         $course : Course()
-        $roomCount : Long(this > 1) from accumulate(
+        accumulate(
             $room : Room()
-            and exists Lecture(course == $course, room == $room),
-            count($room)
+            and exists Lecture(course == $course, room == $room);
+            $roomCount : count($room);
+            $roomCount > 1
         )
     then
         scoreHolder.addSoftConstraintMatch(kcontext, -($roomCount.intValue() - 1));

@@ -21,19 +21,17 @@ import java.io.File;
 import org.junit.Test;
 import org.optaplanner.core.config.solver.EnvironmentMode;
 import org.optaplanner.examples.common.app.SolverPerformanceTest;
-import org.optaplanner.examples.common.persistence.SolutionDao;
-import org.optaplanner.examples.tennis.persistence.TennisDao;
+import org.optaplanner.examples.tennis.domain.TennisSolution;
 
-public class TennisPerformanceTest extends SolverPerformanceTest {
+public class TennisPerformanceTest extends SolverPerformanceTest<TennisSolution> {
 
-    @Override
-    protected String createSolverConfigResource() {
-        return TennisApp.SOLVER_CONFIG;
+    public TennisPerformanceTest(String moveThreadCount) {
+        super(moveThreadCount);
     }
 
     @Override
-    protected SolutionDao createSolutionDao() {
-        return new TennisDao();
+    protected TennisApp createCommonApp() {
+        return new TennisApp();
     }
 
     // ************************************************************************
@@ -43,13 +41,13 @@ public class TennisPerformanceTest extends SolverPerformanceTest {
     @Test(timeout = 600000)
     public void solveModel_munich_7teams() {
         File unsolvedDataFile = new File("data/tennis/unsolved/munich-7teams.xml");
-        runSpeedTest(unsolvedDataFile, "0hard/-742medium/-288soft");
+        runSpeedTest(unsolvedDataFile, "0hard/-27239medium/-23706soft");
     }
 
     @Test(timeout = 600000)
     public void solveModel_munich_7teamsFastAssert() {
         File unsolvedDataFile = new File("data/tennis/unsolved/munich-7teams.xml");
-        runSpeedTest(unsolvedDataFile, "0hard/-742medium/-294soft", EnvironmentMode.FAST_ASSERT);
+        runSpeedTest(unsolvedDataFile, "0hard/-27239medium/-23706soft", EnvironmentMode.FAST_ASSERT);
     }
 
 }

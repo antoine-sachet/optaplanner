@@ -35,7 +35,7 @@ public class OptimisticBoundFirstNodeComparator implements Comparator<Exhaustive
 
     @Override
     public int compare(ExhaustiveSearchNode a, ExhaustiveSearchNode b) {
-        // Investigate better optimistic bound first
+        // Investigate better optimistic bound first (ignore initScore to avoid depth first ordering)
         int optimisticBoundComparison = a.getOptimisticBound().compareTo(b.getOptimisticBound());
         if (optimisticBoundComparison < 0) {
             return -1;
@@ -43,7 +43,7 @@ public class OptimisticBoundFirstNodeComparator implements Comparator<Exhaustive
             return 1;
         }
         // Investigate better score first
-        int scoreComparison = a.getScore().compareTo(b.getScore());
+        int scoreComparison = a.getScore().toInitializedScore().compareTo(b.getScore().toInitializedScore());
         if (scoreComparison < 0) {
             return -1;
         } else if (scoreComparison > 0) {
@@ -57,7 +57,7 @@ public class OptimisticBoundFirstNodeComparator implements Comparator<Exhaustive
         } else if (aDepth > bDepth) {
             return 1;
         }
-        // Investigate higher parent breath index first (to reduce on the churn on workingSolution)
+        // Investigate higher parent breadth index first (to reduce on the churn on workingSolution)
         long aParentBreadth = a.getParentBreadth();
         long bParentBreadth = b.getParentBreadth();
         if (aParentBreadth < bParentBreadth) {
@@ -65,15 +65,8 @@ public class OptimisticBoundFirstNodeComparator implements Comparator<Exhaustive
         } else if (aParentBreadth > bParentBreadth) {
             return 1;
         }
-        // Investigate lower breath index first (to respect ValueSortingManner)
-        long aBreadth = a.getBreadth();
-        long bBreadth = b.getBreadth();
-        if (aBreadth < bBreadth) {
-            return 1;
-        } else if (aBreadth > bBreadth) {
-            return -1;
-        }
-        return 0;
+        // Investigate lower breadth index first (to respect ValueSortingManner)
+        return Long.compare(b.getBreadth(), a.getBreadth());
     }
 
 }

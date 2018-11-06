@@ -29,27 +29,20 @@ import static org.mockito.Mockito.*;
 public class EasyScoreDirectorFactoryTest {
 
     @Test
-    public void getEasyScoreCalculator() {
-        EasyScoreCalculator scoreCalculator = mock(EasyScoreCalculator.class);
-        EasyScoreDirectorFactory directorFactory = new EasyScoreDirectorFactory(scoreCalculator);
-        assertSame(scoreCalculator, directorFactory.getEasyScoreCalculator());
-    }
-
-    @Test
     public void buildScoreDirector() {
-        SolutionDescriptor solutionDescriptor = TestdataSolution.buildSolutionDescriptor();
-        EasyScoreCalculator scoreCalculator = mock(EasyScoreCalculator.class);
-        when(scoreCalculator.calculateScore(any(TestdataSolution.class), anyInt()))
-                .thenAnswer(invocation -> SimpleScore.valueOf(invocation.getArgumentAt(1, Integer.class), -10));
-        EasyScoreDirectorFactory directorFactory = new EasyScoreDirectorFactory(scoreCalculator);
-        directorFactory.setSolutionDescriptor(solutionDescriptor);
+        SolutionDescriptor<TestdataSolution> solutionDescriptor = TestdataSolution.buildSolutionDescriptor();
+        EasyScoreCalculator<TestdataSolution> scoreCalculator = mock(EasyScoreCalculator.class);
+        when(scoreCalculator.calculateScore(any(TestdataSolution.class)))
+                .thenAnswer(invocation -> SimpleScore.of(-10));
+        EasyScoreDirectorFactory<TestdataSolution> directorFactory = new EasyScoreDirectorFactory<>(
+                solutionDescriptor, scoreCalculator);
 
-        EasyScoreDirector director = directorFactory.buildScoreDirector(false);
+        EasyScoreDirector<TestdataSolution> director = directorFactory.buildScoreDirector(false, false);
         TestdataSolution solution = new TestdataSolution();
         solution.setValueList(Collections.emptyList());
         solution.setEntityList(Collections.emptyList());
         director.setWorkingSolution(solution);
-        assertEquals(SimpleScore.valueOf(0, -10), director.calculateScore());
+        assertEquals(SimpleScore.ofUninitialized(0, -10), director.calculateScore());
     }
 
 }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plannerBenchmark>
   <benchmarkDirectory>local/data/travelingtournament/stepLimit</benchmarkDirectory>
+  <warmUpSecondsSpentLimit>0</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -14,7 +15,6 @@
       <solutionClass>org.optaplanner.examples.travelingtournament.domain.TravelingTournament</solutionClass>
       <entityClass>org.optaplanner.examples.travelingtournament.domain.Match</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/travelingtournament/solver/travelingTournamentScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <termination>

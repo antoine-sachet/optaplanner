@@ -17,80 +17,175 @@
 package org.optaplanner.core.api.score.constraint;
 
 import java.io.Serializable;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.collect.Lists;
-import org.apache.commons.lang3.builder.CompareToBuilder;
-import org.kie.api.runtime.rule.RuleContext;
+import org.optaplanner.core.api.domain.constraintweight.ConstraintConfiguration;
+import org.optaplanner.core.api.domain.constraintweight.ConstraintWeight;
+import org.optaplanner.core.api.domain.variable.PlanningVariable;
+import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 
 /**
  * Retrievable from {@link ScoreDirector#getConstraintMatchTotals()}.
  */
-public abstract class ConstraintMatchTotal implements Serializable, Comparable<ConstraintMatchTotal> {
+public final class ConstraintMatchTotal implements Serializable, Comparable<ConstraintMatchTotal> {
 
-    protected final String constraintPackage;
-    protected final String constraintName;
-    protected final int scoreLevel;
+    private final String constraintPackage;
+    private final String constraintName;
+    private final Score constraintWeight;
 
-    protected ConstraintMatchTotal(String constraintPackage, String constraintName, int scoreLevel) {
-        this.constraintPackage = constraintPackage;
-        this.constraintName = constraintName;
-        this.scoreLevel = scoreLevel;
+    private final Set<ConstraintMatch> constraintMatchSet;
+    private Score score;
+
+    /**
+     * @param constraintPackage never null
+     * @param constraintName never null
+     * @param zeroScore never null
+     */
+    public ConstraintMatchTotal(String constraintPackage, String constraintName, Score zeroScore) {
+        this(constraintPackage, constraintName, null, zeroScore);
     }
 
+    /**
+     * @param constraintPackage never null
+     * @param constraintName never null
+     * @param constraintWeight null if {@link ConstraintWeight} isn't used for this constraint
+     * @param zeroScore never null
+     */
+    public ConstraintMatchTotal(String constraintPackage, String constraintName, Score constraintWeight, Score zeroScore) {
+        this.constraintPackage = constraintPackage;
+        this.constraintName = constraintName;
+        constraintMatchSet = new LinkedHashSet<>();
+        this.constraintWeight = constraintWeight;
+        score = zeroScore;
+    }
+
+    /**
+     * @return never null
+     */
     public String getConstraintPackage() {
         return constraintPackage;
     }
 
+    /**
+     * @return never null
+     */
     public String getConstraintName() {
         return constraintName;
     }
 
-    public int getScoreLevel() {
-        return scoreLevel;
+    /**
+     * The value of the {@link ConstraintWeight} annotated member of the {@link ConstraintConfiguration}.
+     * It's independent to the state of the {@link PlanningVariable planning variables}.
+     * Do not confuse with {@link #getScore()}.
+     * @return null if {@link ConstraintWeight} isn't used for this constraint
+     */
+    public Score getConstraintWeight() {
+        return constraintWeight;
     }
 
-    public String getConstraintId() {
-        return constraintPackage + ":" + constraintName + ":" + scoreLevel;
+    /**
+     * @return never null
+     */
+    public Set<ConstraintMatch> getConstraintMatchSet() {
+        return constraintMatchSet;
     }
 
-    public abstract Set<? extends ConstraintMatch> getConstraintMatchSet();
-
+    /**
+     * @return {@code >= 0}
+     */
     public int getConstraintMatchCount() {
         return getConstraintMatchSet().size();
     }
 
-    public abstract Number getWeightTotalAsNumber();
+    /**
+     * Sum of the {@link #getConstraintMatchSet()}'s {@link ConstraintMatch#getScore()}.
+     * @return never null
+     */
+    public Score getScore() {
+        return score;
+    }
+
+    /**
+     * @return never null
+     * @deprecated in favor of {@link #getScore()}
+     */
+    @Deprecated
+    public Score getScoreTotal() {
+        return getScore();
+    }
 
     // ************************************************************************
     // Worker methods
     // ************************************************************************
 
-    protected List<Object> extractJustificationList(RuleContext kcontext) {
-        List<Object> droolsMatchObjects = kcontext.getMatch().getObjects();
-        // Drools always returns the rule matches in reverse order
-        return Lists.reverse(droolsMatchObjects);
+    public ConstraintMatch addConstraintMatch(List<Object> justificationList, Score score) {
+        this.score = this.score.add(score);
+        ConstraintMatch constraintMatch = new ConstraintMatch(constraintPackage, constraintName,
+                justificationList, score);
+        boolean added = constraintMatchSet.add(constraintMatch);
+        if (!added) {
+            throw new IllegalStateException("The constraintMatchTotal (" + this
+                    + ") could not add constraintMatch (" + constraintMatch
+                    + ") to its constraintMatchSet (" + constraintMatchSet + ").");
+        }
+        return constraintMatch;
     }
 
-    public String getIdentificationString() {
-        return constraintPackage + "/" + constraintName + "/level" + scoreLevel;
+    public void removeConstraintMatch(ConstraintMatch constraintMatch) {
+        score = score.subtract(constraintMatch.getScore());
+        boolean removed = constraintMatchSet.remove(constraintMatch);
+        if (!removed) {
+            throw new IllegalStateException("The constraintMatchTotal (" + this
+                    + ") could not remove constraintMatch (" + constraintMatch
+                    + ") from its constraintMatchSet (" + constraintMatchSet + ").");
+        }
+    }
+
+    // ************************************************************************
+    // Infrastructure methods
+    // ************************************************************************
+
+    public String getConstraintId() {
+        return constraintPackage + "/" + constraintName;
     }
 
     @Override
     public int compareTo(ConstraintMatchTotal other) {
-        return new CompareToBuilder()
-                .append(getScoreLevel(), other.getScoreLevel())
-                .append(getConstraintPackage(), other.getConstraintPackage())
-                .append(getConstraintName(), other.getConstraintName())
-                .append(getWeightTotalAsNumber(), other.getWeightTotalAsNumber())
-                .toComparison();
+        if (!constraintPackage.equals(other.constraintPackage)) {
+            return constraintPackage.compareTo(other.constraintPackage);
+        } else if (!constraintName.equals(other.constraintName)) {
+            return constraintName.compareTo(other.constraintName);
+        } else {
+            return 0;
+        }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        } else if (o instanceof ConstraintMatchTotal) {
+            ConstraintMatchTotal other = (ConstraintMatchTotal) o;
+            return constraintPackage.equals(other.constraintPackage)
+                    && constraintName.equals(other.constraintName);
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        return ((17 * 37)
+                + constraintPackage.hashCode()) * 37
+                + constraintName.hashCode();
     }
 
     @Override
     public String toString() {
-        return getIdentificationString() + "=" + getWeightTotalAsNumber();
+        return getConstraintId() + "=" + getScore();
     }
 
 }

@@ -1,10 +1,21 @@
+/*
+ * Copyright 2016 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.optaplanner.core.impl.domain.valuerange.buildin.temporal;
 
-import org.optaplanner.core.impl.domain.valuerange.AbstractCountableValueRange;
-import org.optaplanner.core.impl.domain.valuerange.util.ValueRangeIterator;
-import org.optaplanner.core.impl.solver.random.RandomUtils;
-
-import java.math.BigInteger;
+import java.time.DateTimeException;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalUnit;
@@ -12,7 +23,12 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Random;
 
-public class TemporalValueRange<Temporal_ extends Temporal & Comparable<? super Temporal_>> extends AbstractCountableValueRange<Temporal_> {
+import org.optaplanner.core.impl.domain.valuerange.AbstractCountableValueRange;
+import org.optaplanner.core.impl.domain.valuerange.util.ValueRangeIterator;
+import org.optaplanner.core.impl.solver.random.RandomUtils;
+
+public class TemporalValueRange<Temporal_ extends Temporal & Comparable<? super Temporal_>>
+        extends AbstractCountableValueRange<Temporal_> {
 
     private final Temporal_ from;
     private final Temporal_ to;
@@ -26,7 +42,8 @@ public class TemporalValueRange<Temporal_ extends Temporal & Comparable<? super 
      * @param from never null, inclusive minimum
      * @param to never null, exclusive maximum, {@code >= from}
      * @param incrementUnitAmount {@code > 0}
-     * @param incrementUnitType never null, must be {@link Temporal#isSupported(TemporalUnit) supported} by {@code from} and {@code to}
+     * @param incrementUnitType never null, must be {@link Temporal#isSupported(TemporalUnit) supported} by {@code from}
+     * and {@code to}
      */
     public TemporalValueRange(Temporal_ from, Temporal_ to, long incrementUnitAmount, TemporalUnit incrementUnitType) {
         this.from = from;
@@ -45,37 +62,49 @@ public class TemporalValueRange<Temporal_ extends Temporal & Comparable<? super 
         }
         if (!from.isSupported(incrementUnitType) || !to.isSupported(incrementUnitType)) {
             throw new IllegalArgumentException("The " + getClass().getSimpleName()
-                    + " must have a incrementUnitType (" + incrementUnitType
-                    + ") that is supported by its from (" + from + ") and to (" + to + ").");
+                    + " must have an incrementUnitType (" + incrementUnitType
+                    + ") that is supported by its from (" + from + ") class (" + from.getClass().getSimpleName()
+                    + ") and to (" + to + ") class (" + to.getClass().getSimpleName() + ").");
         }
-        Comparable<Temporal_> comparableFrom = (Comparable<Temporal_>) from;
         // We cannot use Temporal.until() to check bounds due to rounding errors
-        if (comparableFrom.compareTo(to) > 0) {
+        if (from.compareTo(to) > 0) {
             throw new IllegalArgumentException("The " + getClass().getSimpleName()
                     + " cannot have a from (" + from + ") which is strictly higher than its to (" + to + ").");
         }
         long space = from.until(to, incrementUnitType);
-        if (to.equals(from.plus(space + 1, incrementUnitType))) {
+        Temporal expectedTo = from.plus(space, incrementUnitType);
+        if (!to.equals(expectedTo)) {
             // Temporal.until() rounds down, but it needs to round up, to be consistent with Temporal.plus()
             space++;
+            Temporal roundedExpectedTo;
+            try {
+                roundedExpectedTo = from.plus(space, incrementUnitType);
+            } catch (DateTimeException e) {
+                throw new IllegalArgumentException("The " + getClass().getSimpleName()
+                        + "'s incrementUnitType (" + incrementUnitType
+                        + ") must fit an integer number of times in the space (" + space
+                        + ") between from (" + from + ") and to (" + to + ").\n"
+                        + "The to (" + to + ") is not the expectedTo (" + expectedTo + ").", e);
+            }
+            // Fail fast if there's a remainder on type (to be consistent with other value ranges)
+            if (!to.equals(roundedExpectedTo)) {
+                throw new IllegalArgumentException("The " + getClass().getSimpleName()
+                        + "'s incrementUnitType (" + incrementUnitType
+                        + ") must fit an integer number of times in the space (" + space
+                        + ") between from (" + from + ") and to (" + to + ").\n"
+                        + "The to (" + to + ") is not the expectedTo (" + expectedTo
+                        + ") nor the roundedExpectedTo (" + roundedExpectedTo + ").");
+            }
         }
 
         // Fail fast if there's a remainder on amount (to be consistent with other value ranges)
         if (space % incrementUnitAmount > 0) {
             throw new IllegalArgumentException("The " + getClass().getSimpleName()
-                    + " 's incrementUnitAmount (" + incrementUnitAmount
+                    + "'s incrementUnitAmount (" + incrementUnitAmount
                     + ") must fit an integer number of times in the space (" + space
                     + ") between from (" + from + ") and to (" + to + ").");
         }
-        // Fail fast if there's a remainder on type (to be consistent with other value ranges)
-        if (!to.equals(from.plus(space, incrementUnitType))) {
-            throw new IllegalArgumentException("The " + getClass().getSimpleName()
-                    + " 's incrementUnitType (" + incrementUnitType
-                    + ") must fit an integer number of times in the space (" + space
-                    + ") between from (" + from + ") and to (" + to + ").\n"
-                    + "The to (" + to + ") is not the expected to (" + from.plus(space, incrementUnitType) + ").");
-        }
-        size =  space / incrementUnitAmount;
+        size = space / incrementUnitAmount;
     }
 
     @Override
@@ -105,7 +134,6 @@ public class TemporalValueRange<Temporal_ extends Temporal & Comparable<? super 
             // Temporal.until() rounds down, but it needs to round up, to be consistent with Temporal.plus()
             fromSpace++;
         }
-
 
         // Only checking the modulus is not enough: 1-MAR + 1 month doesn't include 7-MAR but the modulus is 0 anyway
         return fromSpace % incrementUnitAmount == 0

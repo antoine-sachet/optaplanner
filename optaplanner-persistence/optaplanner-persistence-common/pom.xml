@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.optaplanner</groupId>
     <artifactId>optaplanner-persistence</artifactId>
-    <version>7.0.0-SNAPSHOT</version>
+    <version>7.14.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>optaplanner-persistence-common</artifactId>
@@ -20,9 +20,10 @@
 
     This module contains the common persistence integration.
   </description>
+  <url>https://www.optaplanner.org</url>
 
   <properties>
-    <osgi.Bundle-SymbolicName>org.optaplanner.persistence.common</osgi.Bundle-SymbolicName>
+    <java.module.name>org.optaplanner.persistence.common</java.module.name>
   </properties>
 
   <dependencies>
@@ -35,30 +36,6 @@
       <groupId>org.optaplanner</groupId>
       <artifactId>optaplanner-core</artifactId>
       <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <!-- External dependencies -->
-    <!-- Common utils -->
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <!-- Logging -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

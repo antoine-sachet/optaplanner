@@ -20,8 +20,6 @@ import java.io.File;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,10 +27,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import org.optaplanner.examples.common.app.CommonApp;
 import org.optaplanner.examples.common.app.LoggingMain;
 import org.optaplanner.examples.common.persistence.AbstractSolutionImporter;
-import org.optaplanner.examples.common.persistence.SolutionDao;
-import org.optaplanner.examples.common.persistence.StringDataGenerator;
+import org.optaplanner.examples.common.persistence.generator.StringDataGenerator;
+import org.optaplanner.examples.taskassigning.app.TaskAssigningApp;
 import org.optaplanner.examples.taskassigning.domain.Affinity;
 import org.optaplanner.examples.taskassigning.domain.Customer;
 import org.optaplanner.examples.taskassigning.domain.Employee;
@@ -41,11 +40,28 @@ import org.optaplanner.examples.taskassigning.domain.Skill;
 import org.optaplanner.examples.taskassigning.domain.Task;
 import org.optaplanner.examples.taskassigning.domain.TaskAssigningSolution;
 import org.optaplanner.examples.taskassigning.domain.TaskType;
+import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
+import org.optaplanner.persistence.xstream.impl.domain.solution.XStreamSolutionFileIO;
 
 public class TaskAssigningGenerator extends LoggingMain {
 
-    private static final StringDataGenerator skillNameGenerator = new StringDataGenerator()
-            .addPart(
+    public static final int BASE_DURATION_MINIMUM = 30;
+    public static final int BASE_DURATION_MAXIMUM = 90;
+    public static final int BASE_DURATION_AVERAGE = BASE_DURATION_MINIMUM + BASE_DURATION_MAXIMUM / 2;
+    private static final int SKILL_SET_SIZE_MINIMUM = 2;
+    private static final int SKILL_SET_SIZE_MAXIMUM = 4;
+
+    public static void main(String[] args) {
+        TaskAssigningGenerator generator = new TaskAssigningGenerator();
+        generator.writeTaskAssigningSolution(24, 8);
+        generator.writeTaskAssigningSolution(50, 5);
+        generator.writeTaskAssigningSolution(100, 5);
+        generator.writeTaskAssigningSolution(500, 20);
+        // For more tasks, switch to BendableLongScore to avoid overflow in the score.
+    }
+
+    private final StringDataGenerator skillNameGenerator = new StringDataGenerator()
+            .addPart(true, 0,
                     "Problem",
                     "Team",
                     "Business",
@@ -56,7 +72,7 @@ public class TaskAssigningGenerator extends LoggingMain {
                     "Conflict",
                     "IT",
                     "Academic")
-            .addPart(
+            .addPart(true, 1,
                     "Solving",
                     "Building",
                     "Storytelling",
@@ -67,8 +83,8 @@ public class TaskAssigningGenerator extends LoggingMain {
                     "Resolution",
                     "Engineering",
                     "Research");
-    private static final StringDataGenerator taskTypeNameGenerator = new StringDataGenerator()
-            .addPart(
+    private final StringDataGenerator taskTypeNameGenerator = new StringDataGenerator()
+            .addPart(true, 0,
                     "Improve",
                     "Expand",
                     "Shrink",
@@ -79,7 +95,7 @@ public class TaskAssigningGenerator extends LoggingMain {
                     "Merge",
                     "Double",
                     "Optimize")
-            .addPart(
+            .addPart(true, 1,
                     "Sales",
                     "Tax",
                     "VAT",
@@ -90,7 +106,7 @@ public class TaskAssigningGenerator extends LoggingMain {
                     "Contract",
                     "Financial",
                     "Advertisement")
-            .addPart(
+            .addPart(false, 2,
                     "Software",
                     "Development",
                     "Accounting",
@@ -101,33 +117,17 @@ public class TaskAssigningGenerator extends LoggingMain {
                     "Lobbying",
                     "Engineering",
                     "Research");
-    private static final StringDataGenerator customerNameGenerator = StringDataGenerator.build1kCompanyNames();
-    private static final StringDataGenerator employeeNameGenerator = StringDataGenerator.build10kFullNames();
-    public static final int BASE_DURATION_MINIMUM = 30;
-    public static final int BASE_DURATION_MAXIMUM = 90;
-    public static final int BASE_DURATION_AVERAGE = BASE_DURATION_MINIMUM + BASE_DURATION_MAXIMUM / 2;
-    private static final int SKILL_SET_SIZE_MINIMUM = 2;
-    private static final int SKILL_SET_SIZE_MAXIMUM = 4;
+    private final StringDataGenerator customerNameGenerator = StringDataGenerator.buildCompanyNames();
+    private final StringDataGenerator employeeNameGenerator = StringDataGenerator.buildFullNames();
 
-    public static void main(String[] args) {
-        new TaskAssigningGenerator().generate();
-    }
-
-    protected final SolutionDao solutionDao;
+    protected final SolutionFileIO<TaskAssigningSolution> solutionFileIO;
     protected final File outputDir;
+
     protected Random random;
 
     public TaskAssigningGenerator() {
-        solutionDao = new TaskAssigningDao();
-        outputDir = new File(solutionDao.getDataDir(), "unsolved");
-    }
-
-    public void generate() {
-        writeTaskAssigningSolution(24, 8);
-        writeTaskAssigningSolution(50, 5);
-        writeTaskAssigningSolution(100, 5);
-        writeTaskAssigningSolution(500, 20);
-        // For more tasks, switch to BendableLongScore to avoid overflow in the score.
+        solutionFileIO = new XStreamSolutionFileIO<>(TaskAssigningSolution.class);
+        outputDir = new File(CommonApp.determineDataDir(TaskAssigningApp.DATA_DIR_NAME), "unsolved");
     }
 
     private void writeTaskAssigningSolution(int taskListSize, int employeeListSize) {
@@ -138,7 +138,8 @@ public class TaskAssigningGenerator extends LoggingMain {
         File outputFile = new File(outputDir, fileName + ".xml");
         TaskAssigningSolution solution = createTaskAssigningSolution(fileName,
                 taskListSize, skillListSize, employeeListSize, taskTypeListSize, customerListSize);
-        solutionDao.writeSolution(solution, outputFile);
+        solutionFileIO.write(solution, outputFile);
+        logger.info("Saved: {}", outputFile);
     }
 
     private String determineFileName(int taskListSize, int employeeListSize) {
@@ -148,10 +149,6 @@ public class TaskAssigningGenerator extends LoggingMain {
     public TaskAssigningSolution createTaskAssigningSolution(String fileName, int taskListSize, int skillListSize,
             int employeeListSize, int taskTypeListSize, int customerListSize) {
         random = new Random(37);
-        skillNameGenerator.reset();
-        taskTypeNameGenerator.reset();
-        customerNameGenerator.reset();
-        employeeNameGenerator.reset();
         TaskAssigningSolution solution = new TaskAssigningSolution();
         solution.setId(0L);
 
@@ -160,10 +157,11 @@ public class TaskAssigningGenerator extends LoggingMain {
         createEmployeeList(solution, employeeListSize);
         createTaskTypeList(solution, taskTypeListSize);
         createTaskList(solution, taskListSize);
+        solution.setFrozenCutoff(0);
 
-        BigInteger possibleSolutionSize
-                = AbstractSolutionImporter.InputBuilder.factorial(taskListSize + employeeListSize - 1)
-                .divide(AbstractSolutionImporter.InputBuilder.factorial(employeeListSize - 1));
+        BigInteger a = AbstractSolutionImporter.factorial(taskListSize + employeeListSize - 1);
+        BigInteger b = AbstractSolutionImporter.factorial(employeeListSize - 1);
+        BigInteger possibleSolutionSize = (a == null || b == null) ? null : a.divide(b);
         logger.info("TaskAssigningSolution {} has {} tasks, {} skills, {} employees, {} task types and {} customers with a search space of {}.",
                 fileName,
                 taskListSize,
@@ -177,12 +175,13 @@ public class TaskAssigningGenerator extends LoggingMain {
 
     private void createSkillList(TaskAssigningSolution solution, int skillListSize) {
         List<Skill> skillList = new ArrayList<>(skillListSize);
+        skillNameGenerator.predictMaximumSizeAndReset(skillListSize);
         for (int i = 0; i < skillListSize; i++) {
             Skill skill = new Skill();
             skill.setId((long) i);
             String skillName = skillNameGenerator.generateNextValue();
             skill.setName(skillName);
-            logger.trace("Created skill with skillName ({}).",skillName);
+            logger.trace("Created skill with skillName ({}).", skillName);
             skillList.add(skill);
         }
         solution.setSkillList(skillList);
@@ -190,12 +189,13 @@ public class TaskAssigningGenerator extends LoggingMain {
 
     private void createCustomerList(TaskAssigningSolution solution, int customerListSize) {
         List<Customer> customerList = new ArrayList<>(customerListSize);
+        customerNameGenerator.predictMaximumSizeAndReset(customerListSize);
         for (int i = 0; i < customerListSize; i++) {
             Customer customer = new Customer();
             customer.setId((long) i);
             String customerName = customerNameGenerator.generateNextValue();
             customer.setName(customerName);
-            logger.trace("Created skill with customerName ({}).",customerName);
+            logger.trace("Created skill with customerName ({}).", customerName);
             customerList.add(customer);
         }
         solution.setCustomerList(customerList);
@@ -207,6 +207,7 @@ public class TaskAssigningGenerator extends LoggingMain {
         Affinity[] affinities = Affinity.values();
         List<Employee> employeeList = new ArrayList<>(employeeListSize);
         int skillListIndex = 0;
+        employeeNameGenerator.predictMaximumSizeAndReset(employeeListSize);
         for (int i = 0; i < employeeListSize; i++) {
             Employee employee = new Employee();
             employee.setId((long) i);
@@ -237,16 +238,35 @@ public class TaskAssigningGenerator extends LoggingMain {
         List<Employee> employeeList = solution.getEmployeeList();
         List<TaskType> taskTypeList = new ArrayList<>(taskTypeListSize);
         Set<String> codeSet = new LinkedHashSet<>(taskTypeListSize);
+        taskTypeNameGenerator.predictMaximumSizeAndReset(taskTypeListSize);
         for (int i = 0; i < taskTypeListSize; i++) {
             TaskType taskType = new TaskType();
             taskType.setId((long) i);
             String title = taskTypeNameGenerator.generateNextValue();
             taskType.setTitle(title);
-            String code = title.replaceAll("(\\w)\\w* (\\w)\\w* (\\w)\\w*", "$1$2$3");
-            taskType.setCode(code);
-            if (!codeSet.add(code)) {
-                throw new IllegalStateException("The taskType code (" + codeSet.add(code) + ") already exists.");
+            String code;
+            switch (title.replaceAll("[^ ]", "").length() + 1) {
+                case 3:
+                    code = title.replaceAll("(\\w)\\w* (\\w)\\w* (\\w)\\w*", "$1$2$3");
+                    break;
+                case 2:
+                    code = title.replaceAll("(\\w)\\w* (\\w)\\w*", "$1$2");
+                    break;
+                case 1:
+                    code = title.replaceAll("(\\w)\\w*", "$1");
+                    break;
+                default:
+                    throw new IllegalStateException("Cannot convert title (" + title + ") into a code.");
             }
+            if (codeSet.contains(code)) {
+                int codeSuffixNumber = 1;
+                while (codeSet.contains(code + codeSuffixNumber)) {
+                    codeSuffixNumber++;
+                }
+                code = code + codeSuffixNumber;
+            }
+            codeSet.add(code);
+            taskType.setCode(code);
             taskType.setBaseDuration(
                     BASE_DURATION_MINIMUM + random.nextInt(BASE_DURATION_MAXIMUM - BASE_DURATION_MINIMUM));
             Employee randomEmployee = employeeList.get(random.nextInt(employeeList.size()));

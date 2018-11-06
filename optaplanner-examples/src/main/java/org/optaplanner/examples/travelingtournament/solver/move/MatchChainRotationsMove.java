@@ -25,12 +25,12 @@ import java.util.List;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.examples.travelingtournament.domain.Day;
 import org.optaplanner.examples.travelingtournament.domain.Match;
+import org.optaplanner.examples.travelingtournament.domain.TravelingTournament;
 
-public class MatchChainRotationsMove extends AbstractMove {
+public class MatchChainRotationsMove extends AbstractMove<TravelingTournament> {
 
     private List<Match> firstMatchList;
     private List<Match> secondMatchList;
@@ -41,12 +41,12 @@ public class MatchChainRotationsMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<TravelingTournament> scoreDirector) {
         return true;
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public MatchChainRotationsMove createUndoMove(ScoreDirector<TravelingTournament> scoreDirector) {
         List<Match> inverseFirstMatchList = new ArrayList<>(firstMatchList);
         Collections.reverse(inverseFirstMatchList);
         List<Match> inverseSecondMatchList = new ArrayList<>(secondMatchList);
@@ -55,14 +55,14 @@ public class MatchChainRotationsMove extends AbstractMove {
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<TravelingTournament> scoreDirector) {
         rotateList(scoreDirector, firstMatchList);
         if (!secondMatchList.isEmpty()) { // TODO create SingleMatchListRotateMove
             rotateList(scoreDirector, secondMatchList);
         }
     }
 
-    private void rotateList(ScoreDirector scoreDirector, List<Match> matchList) {
+    private void rotateList(ScoreDirector<TravelingTournament> scoreDirector, List<Match> matchList) {
         Iterator<Match> it = matchList.iterator();
         Match previousMatch = it.next();
         Match match = null;
@@ -73,6 +73,12 @@ public class MatchChainRotationsMove extends AbstractMove {
             previousMatch = match;
         }
         TravelingTournamentMoveHelper.moveDay(scoreDirector, match, firstDay);
+    }
+
+    @Override
+    public MatchChainRotationsMove rebase(ScoreDirector<TravelingTournament> destinationScoreDirector) {
+        return new MatchChainRotationsMove(rebaseList(firstMatchList, destinationScoreDirector),
+                rebaseList(secondMatchList, destinationScoreDirector));
     }
 
     @Override
@@ -95,6 +101,7 @@ public class MatchChainRotationsMove extends AbstractMove {
         return values;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -109,6 +116,7 @@ public class MatchChainRotationsMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(firstMatchList)
@@ -116,6 +124,7 @@ public class MatchChainRotationsMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         return "Rotation " + firstMatchList + " & Rotation " + secondMatchList;
     }

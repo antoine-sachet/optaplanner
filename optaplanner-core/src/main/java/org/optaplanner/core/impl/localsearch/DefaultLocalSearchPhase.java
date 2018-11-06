@@ -23,7 +23,9 @@ import org.optaplanner.core.impl.localsearch.event.LocalSearchPhaseLifecycleList
 import org.optaplanner.core.impl.localsearch.scope.LocalSearchPhaseScope;
 import org.optaplanner.core.impl.localsearch.scope.LocalSearchStepScope;
 import org.optaplanner.core.impl.phase.AbstractPhase;
+import org.optaplanner.core.impl.solver.recaller.BestSolutionRecaller;
 import org.optaplanner.core.impl.solver.scope.DefaultSolverScope;
+import org.optaplanner.core.impl.solver.termination.Termination;
 
 /**
  * Default implementation of {@link LocalSearchPhase}.
@@ -33,6 +35,11 @@ public class DefaultLocalSearchPhase<Solution_> extends AbstractPhase<Solution_>
         LocalSearchPhaseLifecycleListener<Solution_> {
 
     protected LocalSearchDecider<Solution_> decider;
+
+    public DefaultLocalSearchPhase(int phaseIndex, String logIndentation,
+            BestSolutionRecaller<Solution_> bestSolutionRecaller, Termination termination) {
+        super(phaseIndex, logIndentation, bestSolutionRecaller, termination);
+    }
 
     public LocalSearchDecider<Solution_> getDecider() {
         return decider;
@@ -63,12 +70,14 @@ public class DefaultLocalSearchPhase<Solution_> extends AbstractPhase<Solution_>
             decider.decideNextStep(stepScope);
             if (stepScope.getStep() == null) {
                 if (termination.isPhaseTerminated(phaseScope)) {
-                    logger.trace("    Step index ({}), time spent ({}) terminated without picking a nextStep.",
+                    logger.trace("{}    Step index ({}), time spent ({}) terminated without picking a nextStep.",
+                            logIndentation,
                             stepScope.getStepIndex(),
                             stepScope.getPhaseScope().calculateSolverTimeMillisSpentUpToNow());
                 } else if (stepScope.getSelectedMoveCount() == 0L) {
-                    logger.warn("    No doable selected move at step index ({}), time spent ({})."
+                    logger.warn("{}    No doable selected move at step index ({}), time spent ({})."
                             + " Terminating phase early.",
+                            logIndentation,
                             stepScope.getStepIndex(),
                             stepScope.getPhaseScope().calculateSolverTimeMillisSpentUpToNow());
                 } else {
@@ -87,10 +96,11 @@ public class DefaultLocalSearchPhase<Solution_> extends AbstractPhase<Solution_>
         phaseEnded(phaseScope);
     }
 
-    private void doStep(LocalSearchStepScope<Solution_> stepScope) {
-        Move nextStep = stepScope.getStep();
-        nextStep.doMove(stepScope.getScoreDirector());
-        predictWorkingStepScore(stepScope, nextStep);
+    protected void doStep(LocalSearchStepScope<Solution_> stepScope) {
+        Move<Solution_> step = stepScope.getStep();
+        Move<Solution_> undoStep = step.doMove(stepScope.getScoreDirector());
+        stepScope.setUndoStep(undoStep);
+        predictWorkingStepScore(stepScope, step);
         bestSolutionRecaller.processWorkingSolutionDuringStep(stepScope);
     }
 
@@ -120,8 +130,9 @@ public class DefaultLocalSearchPhase<Solution_> extends AbstractPhase<Solution_>
         decider.stepEnded(stepScope);
         LocalSearchPhaseScope phaseScope = stepScope.getPhaseScope();
         if (logger.isDebugEnabled()) {
-            logger.debug("    LS step ({}), time spent ({}), score ({}), {} best score ({})," +
+            logger.debug("{}    LS step ({}), time spent ({}), score ({}), {} best score ({})," +
                     " accepted/selected move count ({}/{}), picked move ({}).",
+                    logIndentation,
                     stepScope.getStepIndex(),
                     phaseScope.calculateSolverTimeMillisSpentUpToNow(),
                     stepScope.getScore(),
@@ -137,8 +148,9 @@ public class DefaultLocalSearchPhase<Solution_> extends AbstractPhase<Solution_>
         super.phaseEnded(phaseScope);
         decider.phaseEnded(phaseScope);
         phaseScope.endingNow();
-        logger.info("Local Search phase ({}) ended: time spent ({}), best score ({}),"
+        logger.info("{}Local Search phase ({}) ended: time spent ({}), best score ({}),"
                         + " score calculation speed ({}/sec), step total ({}).",
+                logIndentation,
                 phaseIndex,
                 phaseScope.calculateSolverTimeMillisSpentUpToNow(),
                 phaseScope.getBestScore(),

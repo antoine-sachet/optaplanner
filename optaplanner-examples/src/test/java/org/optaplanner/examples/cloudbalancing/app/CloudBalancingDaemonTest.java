@@ -28,10 +28,9 @@ import org.optaplanner.core.api.solver.SolverFactory;
 import org.optaplanner.core.api.solver.event.BestSolutionChangedEvent;
 import org.optaplanner.core.api.solver.event.SolverEventListener;
 import org.optaplanner.core.config.solver.termination.TerminationConfig;
-import org.optaplanner.core.impl.score.director.ScoreDirector;
-import org.optaplanner.core.impl.solver.ProblemFactChange;
 import org.optaplanner.examples.cloudbalancing.domain.CloudBalance;
 import org.optaplanner.examples.cloudbalancing.domain.CloudProcess;
+import org.optaplanner.examples.cloudbalancing.optional.realtime.AddProcessProblemFactChange;
 import org.optaplanner.examples.cloudbalancing.persistence.CloudBalancingGenerator;
 import org.optaplanner.examples.common.app.LoggingTest;
 
@@ -46,12 +45,13 @@ public class CloudBalancingDaemonTest extends LoggingTest {
     private CountDownLatch stage3Latch = new CountDownLatch(1);
 
     private Queue<CloudProcess> notYetAddedProcessQueue = new ArrayDeque<>();
+    private volatile Throwable solverThreadException = null;
 
     @Test(timeout = 600000)
     public void daemon() throws InterruptedException {
         // In main thread
         Solver<CloudBalance> solver = buildSolver();
-        CloudBalance cloudBalance = buildPlanningProblem(4, 12);
+        CloudBalance cloudBalance = buildProblem(4, 12);
         SolverThread solverThread = new SolverThread(solver, cloudBalance);
         solverThread.start();
         // Wait for the solver thread to start up
@@ -61,7 +61,7 @@ public class CloudBalancingDaemonTest extends LoggingTest {
         Thread.sleep(500);
         for (int i = 0; i < 8; i++) {
             CloudProcess process = notYetAddedProcessQueue.poll();
-            solver.addProblemFactChange(new AddProcessChange(process));
+            solver.addProblemFactChange(new AddProcessProblemFactChange(process));
         }
         // Wait until those AddProcessChanges are processed
         waitForNextStage();
@@ -71,7 +71,7 @@ public class CloudBalancingDaemonTest extends LoggingTest {
         Thread.sleep(1000);
         while (!notYetAddedProcessQueue.isEmpty()) {
             CloudProcess process = notYetAddedProcessQueue.poll();
-            solver.addProblemFactChange(new AddProcessChange(process));
+            solver.addProblemFactChange(new AddProcessProblemFactChange(process));
         }
         // Wait until those AddProcessChanges are processed
         waitForNextStage();
@@ -102,7 +102,12 @@ public class CloudBalancingDaemonTest extends LoggingTest {
         public void run() { // In solver thread
             solver.addEventListener(this);
             nextStage(); // For an empty entity list, there is no bestSolutionChanged() event currently
-            solver.solve(cloudBalance);
+            try {
+                solver.solve(cloudBalance);
+            } catch (Throwable e) {
+                solverThreadException = e;
+                nextStage();
+            }
         }
 
         @Override
@@ -117,37 +122,15 @@ public class CloudBalancingDaemonTest extends LoggingTest {
 
     }
 
-    private static class AddProcessChange implements ProblemFactChange<CloudBalance> {
-
-        private final CloudProcess process;
-
-        private AddProcessChange(CloudProcess process) {
-            this.process = process;
-        }
-
-        @Override
-        public void doChange(ScoreDirector<CloudBalance> scoreDirector) { // In solver thread
-            CloudBalance cloudBalance = scoreDirector.getWorkingSolution();
-            // No need to clone the processList because planning cloning already does that
-            scoreDirector.beforeEntityAdded(process);
-            cloudBalance.getProcessList().add(process);
-            scoreDirector.afterEntityAdded(process);
-            scoreDirector.triggerVariableListeners();
-        }
-
-    }
-
     protected Solver<CloudBalance> buildSolver() {
         SolverFactory<CloudBalance> solverFactory = SolverFactory.createFromXmlResource(
-                "org/optaplanner/examples/cloudbalancing/solver/cloudBalancingSolverConfig.xml");
+                CloudBalancingApp.SOLVER_CONFIG);
         solverFactory.getSolverConfig().setDaemon(true);
-        TerminationConfig terminationConfig = new TerminationConfig();
-        terminationConfig.setBestScoreFeasible(true);
-        solverFactory.getSolverConfig().setTerminationConfig(terminationConfig);
+        solverFactory.getSolverConfig().setTerminationConfig(new TerminationConfig().withBestScoreFeasible(true));
         return solverFactory.buildSolver();
     }
 
-    private CloudBalance buildPlanningProblem(int computerListSize, int processListSize) {
+    private CloudBalance buildProblem(int computerListSize, int processListSize) {
         CloudBalance cloudBalance = new CloudBalancingGenerator().createCloudBalance(computerListSize, processListSize);
         notYetAddedProcessQueue.addAll(cloudBalance.getProcessList());
         cloudBalance.setProcessList(new ArrayList<>(notYetAddedProcessQueue.size()));
@@ -172,6 +155,9 @@ public class CloudBalancingDaemonTest extends LoggingTest {
             }
         }
         latch.await();
+        if (solverThreadException != null) {
+            throw new RuntimeException("SolverThread threw an exception.", solverThreadException);
+        }
         // TODO Unlikely race condition: all bestSolutionChanged() could be processed before stageNumber is incremented
         int stage;
         synchronized (stageLock) {

@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.text.NumberFormat;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,7 +39,6 @@ import javax.imageio.ImageIO;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import org.apache.commons.io.IOUtils;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.LogarithmicAxis;
@@ -69,6 +69,7 @@ import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.PureSubSingleStatistic;
 import org.optaplanner.benchmark.impl.statistic.SubSingleStatistic;
 import org.optaplanner.benchmark.impl.statistic.common.MillisecondsSpentNumberFormat;
+import org.optaplanner.core.config.solver.EnvironmentMode;
 import org.optaplanner.core.impl.score.ScoreUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +84,7 @@ public class BenchmarkReport {
     private final PlannerBenchmarkResult plannerBenchmarkResult;
 
     private Locale locale = null;
+    private ZoneId timezoneId = null;
     private Comparator<SolverBenchmarkResult> solverRankingComparator = null;
     private SolverRankingWeightFactory solverRankingWeightFactory = null;
     private File summaryDirectory = null;
@@ -92,6 +94,7 @@ public class BenchmarkReport {
     private List<File> winningScoreDifferenceSummaryChartFileList = null;
     private List<File> worstScoreDifferencePercentageSummaryChartFileList = null;
     private File scoreCalculationSpeedSummaryChartFile = null;
+    private File worstScoreCalculationSpeedDifferencePercentageSummaryChartFile = null;
     private File timeSpentSummaryChartFile = null;
     private File timeSpentScalabilitySummaryChartFile = null;
     private List<File> bestScorePerTimeSpentSummaryChartFileList = null;
@@ -115,6 +118,14 @@ public class BenchmarkReport {
 
     public void setLocale(Locale locale) {
         this.locale = locale;
+    }
+
+    public ZoneId getTimezoneId() {
+        return timezoneId;
+    }
+
+    public void setTimezoneId(ZoneId timezoneId) {
+        this.timezoneId = timezoneId;
     }
 
     public Comparator<SolverBenchmarkResult> getSolverRankingComparator() {
@@ -159,6 +170,10 @@ public class BenchmarkReport {
 
     public File getScoreCalculationSpeedSummaryChartFile() {
         return scoreCalculationSpeedSummaryChartFile;
+    }
+
+    public File getWorstScoreCalculationSpeedDifferencePercentageSummaryChartFile() {
+        return worstScoreCalculationSpeedDifferencePercentageSummaryChartFile;
     }
 
     public File getTimeSpentSummaryChartFile() {
@@ -229,6 +244,7 @@ public class BenchmarkReport {
         writeWorstScoreDifferencePercentageSummaryChart();
         writeBestScoreDistributionSummaryChart();
         writeScoreCalculationSpeedSummaryChart();
+        writeWorstScoreCalculationSpeedDifferencePercentageSummaryChart();
         writeTimeSpentSummaryChart();
         writeTimeSpentScalabilitySummaryChart();
         writeBestScorePerTimeSpentSummaryChart();
@@ -292,31 +308,53 @@ public class BenchmarkReport {
         String javaVmName = System.getProperty("java.vm.name");
         if (javaVmName != null && javaVmName.contains("Client VM")) {
             warningList.add("The Java VM (" + javaVmName + ") is the Client VM."
-                    + " Consider starting the java process with the argument \"-server\" to get better results.");
+                    + " This decreases performance."
+                    + " Maybe start the java process with the argument \"-server\" to get better results.");
         }
-        if (plannerBenchmarkResult.getParallelBenchmarkCount() != null
-                && plannerBenchmarkResult.getAvailableProcessors() != null
-                && plannerBenchmarkResult.getParallelBenchmarkCount() > plannerBenchmarkResult.getAvailableProcessors()) {
-            warningList.add("The parallelBenchmarkCount (" + plannerBenchmarkResult.getParallelBenchmarkCount()
-                    + ") is higher than the number of availableProcessors ("
-                    + plannerBenchmarkResult.getAvailableProcessors() + ").");
+        Integer parallelBenchmarkCount = plannerBenchmarkResult.getParallelBenchmarkCount();
+        Integer availableProcessors = plannerBenchmarkResult.getAvailableProcessors();
+        if (parallelBenchmarkCount != null && availableProcessors != null
+                && parallelBenchmarkCount > availableProcessors) {
+            warningList.add("The parallelBenchmarkCount (" + parallelBenchmarkCount
+                    + ") is higher than the number of availableProcessors (" + availableProcessors + ")."
+                    + " This decreases performance."
+                    + " Maybe reduce the parallelBenchmarkCount.");
+        }
+        EnvironmentMode environmentMode = plannerBenchmarkResult.getEnvironmentMode();
+        if (environmentMode != null && environmentMode.isAsserted()) {
+            warningList.add("The environmentMode (" + environmentMode + ") is asserting."
+                    + " This decreases performance."
+                    + " Maybe set the environmentMode to " + EnvironmentMode.REPRODUCIBLE + ".");
+        }
+        String loggingLevelOptaPlannerCore = plannerBenchmarkResult.getLoggingLevelOptaPlannerCore();
+        if (loggingLevelOptaPlannerCore != null && loggingLevelOptaPlannerCore.equals("trace")) {
+            warningList.add("The loggingLevel (" + loggingLevelOptaPlannerCore + ") of org.optaplanner.core is high."
+                    + " This decreases performance."
+                    + " Maybe set the loggingLevel to debug or lower.");
+        }
+        String loggingLevelDroolsCore = plannerBenchmarkResult.getLoggingLevelDroolsCore();
+        if (loggingLevelDroolsCore != null
+                && (loggingLevelDroolsCore.equals("trace") || loggingLevelDroolsCore.equals("debug"))) {
+            warningList.add("The loggingLevel (" + loggingLevelDroolsCore + ") of org.drools.core is high."
+                    + " This decreases performance."
+                    + " Maybe set the loggingLevel to info or lower.");
         }
     }
 
     private void writeBestScoreSummaryChart() {
-        // Each scoreLevel has it's own dataset and chartFile
+        // Each scoreLevel has its own dataset and chartFile
         List<DefaultCategoryDataset> datasetList = new ArrayList<>(CHARTED_SCORE_LEVEL_SIZE);
         for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
             String solverLabel = solverBenchmarkResult.getNameWithFavoriteSuffix();
             for (SingleBenchmarkResult singleBenchmarkResult : solverBenchmarkResult.getSingleBenchmarkResultList()) {
-                String planningProblemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
+                String problemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
                 if (singleBenchmarkResult.hasAllSuccess()) {
                     double[] levelValues = ScoreUtils.extractLevelDoubles(singleBenchmarkResult.getAverageScore());
                     for (int i = 0; i < levelValues.length && i < CHARTED_SCORE_LEVEL_SIZE; i++) {
                         if (i >= datasetList.size()) {
                             datasetList.add(new DefaultCategoryDataset());
                         }
-                        datasetList.get(i).addValue(levelValues[i], solverLabel, planningProblemLabel);
+                        datasetList.get(i).addValue(levelValues[i], solverLabel, problemLabel);
                     }
                 }
             }
@@ -324,9 +362,10 @@ public class BenchmarkReport {
         bestScoreSummaryChartFileList = new ArrayList<>(datasetList.size());
         int scoreLevelIndex = 0;
         for (DefaultCategoryDataset dataset : datasetList) {
+            String scoreLevelLabel = plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             CategoryPlot plot = createBarChartPlot(dataset,
-                    "Score level " + scoreLevelIndex, NumberFormat.getInstance(locale));
-            JFreeChart chart = new JFreeChart("Best score level " + scoreLevelIndex + " summary (higher is better)",
+                    "Best " + scoreLevelLabel, NumberFormat.getInstance(locale));
+            JFreeChart chart = new JFreeChart("Best " + scoreLevelLabel + " summary (higher is better)",
                     JFreeChart.DEFAULT_TITLE_FONT, plot, true);
             bestScoreSummaryChartFileList.add(writeChartToImageFile(chart, "bestScoreSummaryLevel" + scoreLevelIndex));
             scoreLevelIndex++;
@@ -334,7 +373,7 @@ public class BenchmarkReport {
     }
 
     private void writeBestScoreScalabilitySummaryChart() {
-        // Each scoreLevel has it's own dataset and chartFile
+        // Each scoreLevel has its own dataset and chartFile
         List<List<XYSeries>> seriesListList = new ArrayList<>(
                 CHARTED_SCORE_LEVEL_SIZE);
         int solverBenchmarkIndex = 0;
@@ -362,11 +401,12 @@ public class BenchmarkReport {
         bestScoreScalabilitySummaryChartFileList = new ArrayList<>(seriesListList.size());
         int scoreLevelIndex = 0;
         for (List<XYSeries> seriesList : seriesListList) {
+            String scoreLevelLabel = plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             XYPlot plot = createScalabilityPlot(seriesList,
                     "Problem scale", NumberFormat.getInstance(locale),
-                    "Score level " + scoreLevelIndex, NumberFormat.getInstance(locale));
+                    "Best " + scoreLevelLabel, NumberFormat.getInstance(locale));
             JFreeChart chart = new JFreeChart(
-                    "Best score scalability level " + scoreLevelIndex + " summary (higher is better)",
+                    "Best " + scoreLevelLabel + " scalability summary (higher is better)",
                     JFreeChart.DEFAULT_TITLE_FONT, plot, true);
             bestScoreScalabilitySummaryChartFileList.add(
                     writeChartToImageFile(chart, "bestScoreScalabilitySummaryLevel" + scoreLevelIndex));
@@ -375,12 +415,12 @@ public class BenchmarkReport {
     }
 
     private void writeBestScoreDistributionSummaryChart() {
-        // Each scoreLevel has it's own dataset and chartFile
+        // Each scoreLevel has its own dataset and chartFile
         List<DefaultBoxAndWhiskerCategoryDataset> datasetList = new ArrayList<>(CHARTED_SCORE_LEVEL_SIZE);
         for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
             String solverLabel = solverBenchmarkResult.getNameWithFavoriteSuffix();
             for (SingleBenchmarkResult singleBenchmarkResult : solverBenchmarkResult.getSingleBenchmarkResultList()) {
-                String planningProblemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
+                String problemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
                 if (singleBenchmarkResult.hasAllSuccess()) {
                     List<List<Double>> distributionLevelList = new ArrayList<>(CHARTED_SCORE_LEVEL_SIZE);
                     for (SubSingleBenchmarkResult subSingleBenchmarkResult : singleBenchmarkResult.getSubSingleBenchmarkResultList()) {
@@ -399,7 +439,7 @@ public class BenchmarkReport {
                         datasetList.get(i).add(
                                 distributionLevelList.get(i),
                                 solverLabel,
-                                planningProblemLabel);
+                                problemLabel);
                     }
                 }
             }
@@ -407,9 +447,10 @@ public class BenchmarkReport {
         bestScoreDistributionSummaryChartFileList = new ArrayList<>(datasetList.size());
         int scoreLevelIndex = 0;
         for (DefaultBoxAndWhiskerCategoryDataset dataset : datasetList) {
+            String scoreLevelLabel = plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             CategoryPlot plot = createBoxAndWhiskerChartPlot(dataset,
-                    "Score level " + scoreLevelIndex, NumberFormat.getInstance(locale));
-            JFreeChart chart = new JFreeChart("Best score distribution level " + scoreLevelIndex + " summary (higher is better)",
+                    "Best " + scoreLevelLabel, NumberFormat.getInstance(locale));
+            JFreeChart chart = new JFreeChart("Best " + scoreLevelLabel + " distribution summary (higher is better)",
                     JFreeChart.DEFAULT_TITLE_FONT, plot, true);
             bestScoreDistributionSummaryChartFileList.add(writeChartToImageFile(chart, "bestScoreDistributionSummaryLevel" + scoreLevelIndex));
             scoreLevelIndex++;
@@ -417,19 +458,19 @@ public class BenchmarkReport {
     }
 
     private void writeWinningScoreDifferenceSummaryChart() {
-        // Each scoreLevel has it's own dataset and chartFile
+        // Each scoreLevel has its own dataset and chartFile
         List<DefaultCategoryDataset> datasetList = new ArrayList<>(CHARTED_SCORE_LEVEL_SIZE);
         for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
             String solverLabel = solverBenchmarkResult.getNameWithFavoriteSuffix();
             for (SingleBenchmarkResult singleBenchmarkResult : solverBenchmarkResult.getSingleBenchmarkResultList()) {
-                String planningProblemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
+                String problemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
                 if (singleBenchmarkResult.hasAllSuccess()) {
                     double[] levelValues = ScoreUtils.extractLevelDoubles(singleBenchmarkResult.getWinningScoreDifference());
                     for (int i = 0; i < levelValues.length && i < CHARTED_SCORE_LEVEL_SIZE; i++) {
                         if (i >= datasetList.size()) {
                             datasetList.add(new DefaultCategoryDataset());
                         }
-                        datasetList.get(i).addValue(levelValues[i], solverLabel, planningProblemLabel);
+                        datasetList.get(i).addValue(levelValues[i], solverLabel, problemLabel);
                     }
                 }
             }
@@ -437,10 +478,10 @@ public class BenchmarkReport {
         winningScoreDifferenceSummaryChartFileList = new ArrayList<>(datasetList.size());
         int scoreLevelIndex = 0;
         for (DefaultCategoryDataset dataset : datasetList) {
+            String scoreLevelLabel = plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             CategoryPlot plot = createBarChartPlot(dataset,
-                    "Winning score difference level " + scoreLevelIndex, NumberFormat.getInstance(locale));
-            JFreeChart chart = new JFreeChart("Winning score difference level " + scoreLevelIndex
-                    + " summary (higher is better)",
+                    "Winning " + scoreLevelLabel + " difference", NumberFormat.getInstance(locale));
+            JFreeChart chart = new JFreeChart("Winning " + scoreLevelLabel + " difference summary (higher is better)",
                     JFreeChart.DEFAULT_TITLE_FONT, plot, true);
             winningScoreDifferenceSummaryChartFileList.add(
                     writeChartToImageFile(chart, "winningScoreDifferenceSummaryLevel" + scoreLevelIndex));
@@ -449,19 +490,19 @@ public class BenchmarkReport {
     }
 
     private void writeWorstScoreDifferencePercentageSummaryChart() {
-        // Each scoreLevel has it's own dataset and chartFile
+        // Each scoreLevel has its own dataset and chartFile
         List<DefaultCategoryDataset> datasetList = new ArrayList<>(CHARTED_SCORE_LEVEL_SIZE);
         for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
             String solverLabel = solverBenchmarkResult.getNameWithFavoriteSuffix();
             for (SingleBenchmarkResult singleBenchmarkResult : solverBenchmarkResult.getSingleBenchmarkResultList()) {
-                String planningProblemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
+                String problemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
                 if (singleBenchmarkResult.hasAllSuccess()) {
                     double[] levelValues = singleBenchmarkResult.getWorstScoreDifferencePercentage().getPercentageLevels();
                     for (int i = 0; i < levelValues.length && i < CHARTED_SCORE_LEVEL_SIZE; i++) {
                         if (i >= datasetList.size()) {
                             datasetList.add(new DefaultCategoryDataset());
                         }
-                        datasetList.get(i).addValue(levelValues[i], solverLabel, planningProblemLabel);
+                        datasetList.get(i).addValue(levelValues[i], solverLabel, problemLabel);
                     }
                 }
             }
@@ -469,10 +510,11 @@ public class BenchmarkReport {
         worstScoreDifferencePercentageSummaryChartFileList = new ArrayList<>(datasetList.size());
         int scoreLevelIndex = 0;
         for (DefaultCategoryDataset dataset : datasetList) {
+            String scoreLevelLabel = plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             CategoryPlot plot = createBarChartPlot(dataset,
-                    "Worst score difference percentage level " + scoreLevelIndex,
+                    "Worst " + scoreLevelLabel + " difference percentage",
                     NumberFormat.getPercentInstance(locale));
-            JFreeChart chart = new JFreeChart("Worst score difference percentage level " + scoreLevelIndex
+            JFreeChart chart = new JFreeChart("Worst " + scoreLevelLabel + " difference percentage"
                     + " summary (higher is better)",
                     JFreeChart.DEFAULT_TITLE_FONT, plot, true);
             worstScoreDifferencePercentageSummaryChartFileList.add(
@@ -503,15 +545,37 @@ public class BenchmarkReport {
         scoreCalculationSpeedSummaryChartFile = writeChartToImageFile(chart, "scoreCalculationSpeedSummary");
     }
 
+    private void writeWorstScoreCalculationSpeedDifferencePercentageSummaryChart() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
+            String solverLabel = solverBenchmarkResult.getNameWithFavoriteSuffix();
+            for (SingleBenchmarkResult singleBenchmarkResult : solverBenchmarkResult.getSingleBenchmarkResultList()) {
+                String problemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
+                if (singleBenchmarkResult.hasAllSuccess()) {
+                    double worstScoreCalculationSpeedDifferencePercentage
+                            = singleBenchmarkResult.getWorstScoreCalculationSpeedDifferencePercentage();
+                    dataset.addValue(worstScoreCalculationSpeedDifferencePercentage, solverLabel, problemLabel);
+                }
+            }
+        }
+        CategoryPlot plot = createBarChartPlot(dataset,
+                "Worst score calculation speed difference percentage",
+                NumberFormat.getPercentInstance(locale));
+        JFreeChart chart = new JFreeChart("Worst score calculation speed difference percentage"
+                + " summary (higher is better)",
+                JFreeChart.DEFAULT_TITLE_FONT, plot, true);
+        worstScoreCalculationSpeedDifferencePercentageSummaryChartFile = writeChartToImageFile(chart, "worstScoreCalculationSpeedDifferencePercentageSummary");
+    }
+
     private void writeTimeSpentSummaryChart() {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
             String solverLabel = solverBenchmarkResult.getNameWithFavoriteSuffix();
             for (SingleBenchmarkResult singleBenchmarkResult : solverBenchmarkResult.getSingleBenchmarkResultList()) {
-                String planningProblemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
+                String problemLabel = singleBenchmarkResult.getProblemBenchmarkResult().getName();
                 if (singleBenchmarkResult.hasAllSuccess()) {
                     long timeMillisSpent = singleBenchmarkResult.getTimeMillisSpent();
-                    dataset.addValue(timeMillisSpent, solverLabel, planningProblemLabel);
+                    dataset.addValue(timeMillisSpent, solverLabel, problemLabel);
                 }
             }
         }
@@ -544,7 +608,7 @@ public class BenchmarkReport {
     }
 
     private void writeBestScorePerTimeSpentSummaryChart() {
-        // Each scoreLevel has it's own dataset and chartFile
+        // Each scoreLevel has its own dataset and chartFile
         List<List<XYSeries>> seriesListList = new ArrayList<>(
                 CHARTED_SCORE_LEVEL_SIZE);
         int solverBenchmarkIndex = 0;
@@ -572,11 +636,12 @@ public class BenchmarkReport {
         bestScorePerTimeSpentSummaryChartFileList = new ArrayList<>(seriesListList.size());
         int scoreLevelIndex = 0;
         for (List<XYSeries> seriesList : seriesListList) {
+            String scoreLevelLabel = plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             XYPlot plot = createScalabilityPlot(seriesList,
                     "Time spent", new MillisecondsSpentNumberFormat(locale),
-                    "Score level " + scoreLevelIndex, NumberFormat.getInstance(locale));
+                    "Best " + scoreLevelLabel, NumberFormat.getInstance(locale));
             JFreeChart chart = new JFreeChart(
-                    "Best score per time spent level " + scoreLevelIndex + " summary (higher left is better)",
+                    "Best " + scoreLevelLabel + " per time spent summary (higher left is better)",
                     JFreeChart.DEFAULT_TITLE_FONT, plot, true);
             bestScorePerTimeSpentSummaryChartFileList.add(
                     writeChartToImageFile(chart, "bestScorePerTimeSpentSummaryLevel" + scoreLevelIndex));
@@ -687,14 +752,10 @@ public class BenchmarkReport {
     private File writeChartToImageFile(JFreeChart chart, String fileNameBase) {
         BufferedImage chartImage = chart.createBufferedImage(1024, 768);
         File summaryChartFile = new File(summaryDirectory, fileNameBase + ".png");
-        OutputStream out = null;
-        try {
-            out = new FileOutputStream(summaryChartFile);
+        try (OutputStream out = new FileOutputStream(summaryChartFile)) {
             ImageIO.write(chartImage, "png", out);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Problem writing summaryChartFile: " + summaryChartFile, e);
-        } finally {
-            IOUtils.closeQuietly(out);
+            throw new IllegalArgumentException("Failed writing summaryChartFile (" + summaryChartFile + ").", e);
         }
         return summaryChartFile;
     }
@@ -738,7 +799,7 @@ public class BenchmarkReport {
         WebsiteResourceUtils.copyResourcesTo(benchmarkReportDirectory);
 
         htmlOverviewFile = new File(benchmarkReportDirectory, "index.html");
-        Configuration freemarkerCfg = new Configuration();
+        Configuration freemarkerCfg = new Configuration(Configuration.DEFAULT_INCOMPATIBLE_IMPROVEMENTS);
         freemarkerCfg.setDefaultEncoding("UTF-8");
         freemarkerCfg.setLocale(locale);
         freemarkerCfg.setClassForTemplateLoading(BenchmarkReport.class, "");
@@ -748,10 +809,8 @@ public class BenchmarkReport {
         model.put("benchmarkReport", this);
         model.put("reportHelper", new ReportHelper());
 
-        Writer writer = null;
-        try {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(htmlOverviewFile), "UTF-8")) {
             Template template = freemarkerCfg.getTemplate(templateFilename);
-            writer = new OutputStreamWriter(new FileOutputStream(htmlOverviewFile), "UTF-8");
             template.process(model, writer);
         } catch (IOException e) {
             throw new IllegalArgumentException("Can not read templateFilename (" + templateFilename
@@ -759,8 +818,6 @@ public class BenchmarkReport {
         } catch (TemplateException e) {
             throw new IllegalArgumentException("Can not process Freemarker templateFilename (" + templateFilename
                     + ") to htmlOverviewFile (" + htmlOverviewFile + ").", e);
-        } finally {
-            IOUtils.closeQuietly(writer);
         }
     }
 

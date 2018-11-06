@@ -17,6 +17,7 @@
 package org.optaplanner.core.api.score.buildin.simpledouble;
 
 import org.junit.Test;
+import org.kie.api.definition.rule.Rule;
 import org.kie.api.runtime.rule.RuleContext;
 import org.optaplanner.core.api.score.holder.AbstractScoreHolderTest;
 
@@ -37,21 +38,59 @@ public class SimpleDoubleScoreHolderTest extends AbstractScoreHolderTest {
     public void addConstraintMatch(boolean constraintMatchEnabled) {
         SimpleDoubleScoreHolder scoreHolder = new SimpleDoubleScoreHolder(constraintMatchEnabled);
 
-        scoreHolder.addConstraintMatch(mockRuleContext("scoreRule1"), -10.00);
+        RuleContext scoreRule1 = mockRuleContext("scoreRule1");
+        scoreHolder.addConstraintMatch(scoreRule1, -10.00);
 
-        RuleContext ruleContext2 = mockRuleContext("scoreRule2");
-        scoreHolder.addConstraintMatch(ruleContext2, -2.00);
-        callUnMatch(ruleContext2);
+        RuleContext scoreRule2 = mockRuleContext("scoreRule2");
+        scoreHolder.addConstraintMatch(scoreRule2, -2.00);
+        callOnDelete(scoreRule2);
 
-        RuleContext ruleContext3 = mockRuleContext("scoreRule3");
-        scoreHolder.addConstraintMatch(ruleContext3, -0.30);
-        scoreHolder.addConstraintMatch(ruleContext3, -0.03); // Overwrite existing
+        RuleContext scoreRule3 = mockRuleContext("scoreRule3");
+        scoreHolder.addConstraintMatch(scoreRule3, -0.30);
+        callOnUpdate(scoreRule3);
+        scoreHolder.addConstraintMatch(scoreRule3, -0.03); // Overwrite existing
 
-        assertEquals(SimpleDoubleScore.valueOf(0, -10.03), scoreHolder.extractScore(0));
-        assertEquals(SimpleDoubleScore.valueOf(-7, -10.03), scoreHolder.extractScore(-7));
+        assertEquals(SimpleDoubleScore.ofUninitialized(0, -10.03), scoreHolder.extractScore(0));
+        assertEquals(SimpleDoubleScore.ofUninitialized(-7, -10.03), scoreHolder.extractScore(-7));
         if (constraintMatchEnabled) {
-            assertEquals(3, scoreHolder.getConstraintMatchTotals().size());
+            assertEquals(SimpleDoubleScore.of(-10.00), findConstraintMatchTotal(scoreHolder, "scoreRule1").getScore());
         }
+    }
+
+    @Test
+    public void rewardPenalizeWithConstraintMatch() {
+        rewardPenalize(true);
+    }
+
+    @Test
+    public void rewardPenalizeWithoutConstraintMatch() {
+        rewardPenalize(false);
+    }
+
+    public void rewardPenalize(boolean constraintMatchEnabled) {
+        SimpleDoubleScoreHolder scoreHolder = new SimpleDoubleScoreHolder(constraintMatchEnabled);
+        Rule constraint1 = mockRule("constraint1");
+        scoreHolder.configureConstraintWeight(constraint1, SimpleDoubleScore.of(10.0));
+        Rule constraint2 = mockRule("constraint2");
+        scoreHolder.configureConstraintWeight(constraint2, SimpleDoubleScore.of(100.0));
+
+        scoreHolder.penalize(mockRuleContext(constraint1));
+        assertEquals(SimpleDoubleScore.of(-10.0), scoreHolder.extractScore(0));
+
+        scoreHolder.penalize(mockRuleContext(constraint2), 2.0);
+        assertEquals(SimpleDoubleScore.of(-210.0), scoreHolder.extractScore(0));
+
+        scoreHolder = new SimpleDoubleScoreHolder(constraintMatchEnabled);
+        Rule constraint3 = mockRule("constraint3");
+        scoreHolder.configureConstraintWeight(constraint3, SimpleDoubleScore.of(10.0));
+        Rule constraint4 = mockRule("constraint4");
+        scoreHolder.configureConstraintWeight(constraint4, SimpleDoubleScore.of(100.0));
+
+        scoreHolder.reward(mockRuleContext(constraint3));
+        assertEquals(SimpleDoubleScore.of(10.0), scoreHolder.extractScore(0));
+
+        scoreHolder.reward(mockRuleContext(constraint4), 3.0);
+        assertEquals(SimpleDoubleScore.of(310.0), scoreHolder.extractScore(0));
     }
 
 }

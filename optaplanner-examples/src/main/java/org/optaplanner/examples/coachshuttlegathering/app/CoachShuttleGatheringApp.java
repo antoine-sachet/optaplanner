@@ -17,20 +17,21 @@
 package org.optaplanner.examples.coachshuttlegathering.app;
 
 import org.optaplanner.examples.coachshuttlegathering.domain.CoachShuttleGatheringSolution;
-import org.optaplanner.examples.coachshuttlegathering.persistence.CoachShuttleGatheringDao;
 import org.optaplanner.examples.coachshuttlegathering.persistence.CoachShuttleGatheringExporter;
 import org.optaplanner.examples.coachshuttlegathering.persistence.CoachShuttleGatheringImporter;
 import org.optaplanner.examples.coachshuttlegathering.swingui.CoachShuttleGatheringPanel;
 import org.optaplanner.examples.common.app.CommonApp;
 import org.optaplanner.examples.common.persistence.AbstractSolutionExporter;
 import org.optaplanner.examples.common.persistence.AbstractSolutionImporter;
-import org.optaplanner.examples.common.persistence.SolutionDao;
-import org.optaplanner.examples.common.swingui.SolutionPanel;
+import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
+import org.optaplanner.persistence.xstream.impl.domain.solution.XStreamSolutionFileIO;
 
 public class CoachShuttleGatheringApp extends CommonApp<CoachShuttleGatheringSolution> {
 
     public static final String SOLVER_CONFIG
             = "org/optaplanner/examples/coachshuttlegathering/solver/coachShuttleGatheringSolverConfig.xml";
+
+    public static final String DATA_DIR_NAME = "coachshuttlegathering";
 
     public static void main(String[] args) {
         prepareSwingEnvironment();
@@ -40,18 +41,18 @@ public class CoachShuttleGatheringApp extends CommonApp<CoachShuttleGatheringSol
     public CoachShuttleGatheringApp() {
         super("Coach shuttle gathering",
                 "Transport passengers to a hub by using coaches and shuttles.",
-                SOLVER_CONFIG,
+                SOLVER_CONFIG, DATA_DIR_NAME,
                 CoachShuttleGatheringPanel.LOGO_PATH);
     }
 
     @Override
-    protected SolutionPanel createSolutionPanel() {
+    protected CoachShuttleGatheringPanel createSolutionPanel() {
         return new CoachShuttleGatheringPanel();
     }
 
     @Override
-    protected SolutionDao createSolutionDao() {
-        return new CoachShuttleGatheringDao();
+    public SolutionFileIO<CoachShuttleGatheringSolution> createSolutionFileIO() {
+        return new XStreamSolutionFileIO<>(CoachShuttleGatheringSolution.class);
     }
 
     @Override

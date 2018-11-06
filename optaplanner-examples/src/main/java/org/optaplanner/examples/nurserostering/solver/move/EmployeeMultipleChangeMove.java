@@ -25,12 +25,12 @@ import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.examples.nurserostering.domain.Employee;
+import org.optaplanner.examples.nurserostering.domain.NurseRoster;
 import org.optaplanner.examples.nurserostering.domain.ShiftAssignment;
 
-public class EmployeeMultipleChangeMove extends AbstractMove {
+public class EmployeeMultipleChangeMove extends AbstractMove<NurseRoster> {
 
     private Employee fromEmployee;
     private List<ShiftAssignment> shiftAssignmentList;
@@ -43,17 +43,17 @@ public class EmployeeMultipleChangeMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<NurseRoster> scoreDirector) {
         return !Objects.equals(fromEmployee, toEmployee);
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public EmployeeMultipleChangeMove createUndoMove(ScoreDirector<NurseRoster> scoreDirector) {
         return new EmployeeMultipleChangeMove(toEmployee, shiftAssignmentList, fromEmployee);
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<NurseRoster> scoreDirector) {
         for (ShiftAssignment shiftAssignment : shiftAssignmentList) {
             if (!shiftAssignment.getEmployee().equals(fromEmployee)) {
                 throw new IllegalStateException("The shiftAssignment (" + shiftAssignment + ") should have the same employee ("
@@ -61,6 +61,13 @@ public class EmployeeMultipleChangeMove extends AbstractMove {
             }
             NurseRosteringMoveHelper.moveEmployee(scoreDirector, shiftAssignment, toEmployee);
         }
+    }
+
+    @Override
+    public EmployeeMultipleChangeMove rebase(ScoreDirector<NurseRoster> destinationScoreDirector) {
+        return new EmployeeMultipleChangeMove(destinationScoreDirector.lookUpWorkingObject(fromEmployee),
+                rebaseList(shiftAssignmentList, destinationScoreDirector),
+                destinationScoreDirector.lookUpWorkingObject(toEmployee));
     }
 
     @Override
@@ -73,6 +80,7 @@ public class EmployeeMultipleChangeMove extends AbstractMove {
         return Arrays.asList(fromEmployee, toEmployee);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -88,6 +96,7 @@ public class EmployeeMultipleChangeMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(fromEmployee)
@@ -96,6 +105,7 @@ public class EmployeeMultipleChangeMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         return shiftAssignmentList + " {? -> " + toEmployee + "}";
     }

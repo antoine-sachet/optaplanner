@@ -23,7 +23,6 @@ import org.optaplanner.benchmark.api.PlannerBenchmarkException;
 import org.optaplanner.benchmark.api.PlannerBenchmarkFactory;
 import org.optaplanner.benchmark.config.PlannerBenchmarkConfig;
 import org.optaplanner.examples.common.app.PlannerBenchmarkTest;
-import org.optaplanner.examples.nqueens.domain.Row;
 
 public class BrokenNQueensBenchmarkTest extends PlannerBenchmarkTest {
 
@@ -37,8 +36,8 @@ public class BrokenNQueensBenchmarkTest extends PlannerBenchmarkTest {
         PlannerBenchmarkFactory benchmarkFactory = super.buildPlannerBenchmarkFactory(unsolvedDataFile);
         PlannerBenchmarkConfig benchmarkConfig = benchmarkFactory.getPlannerBenchmarkConfig();
         benchmarkConfig.setWarmUpSecondsSpentLimit(0L);
-        benchmarkConfig.getInheritedSolverBenchmarkConfig().getSolverConfig().getEntityClassList()
-                .add(Row.class); // Intentionally crash the solver
+        benchmarkConfig.getInheritedSolverBenchmarkConfig().getSolverConfig().getTerminationConfig()
+                .setStepCountLimit(-100); // Intentionally crash the solver
         return benchmarkFactory;
     }
 

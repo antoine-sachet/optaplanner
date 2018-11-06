@@ -31,14 +31,6 @@ public abstract class AbstractPngSolutionImporter<Solution_> extends AbstractSol
 
     private static final String DEFAULT_INPUT_FILE_SUFFIX = "png";
 
-    protected AbstractPngSolutionImporter(SolutionDao<Solution_> solutionDao) {
-        super(solutionDao);
-    }
-
-    protected AbstractPngSolutionImporter(boolean withoutDao) {
-        super(withoutDao);
-    }
-
     @Override
     public String getInputFileSuffix() {
         return DEFAULT_INPUT_FILE_SUFFIX;
@@ -57,10 +49,8 @@ public abstract class AbstractPngSolutionImporter<Solution_> extends AbstractSol
                 Solution_ solution = pngInputBuilder.readSolution();
                 logger.info("Imported: {}", inputFile);
                 return solution;
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException | IllegalStateException e) {
                 throw new IllegalArgumentException("Exception in inputFile (" + inputFile + ")", e);
-            } catch (IllegalStateException e) {
-                throw new IllegalStateException("Exception in inputFile (" + inputFile + ")", e);
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read the file (" + inputFile.getName() + ").", e);

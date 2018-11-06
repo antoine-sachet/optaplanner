@@ -23,23 +23,27 @@ import java.util.List;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.impl.domain.variable.anchor.AnchorVariableSupply;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
 import org.optaplanner.core.impl.domain.variable.inverserelation.SingletonInverseVariableSupply;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 
-public class KOptMove extends AbstractMove {
+/**
+ * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
+ */
+public class KOptMove<Solution_> extends AbstractMove<Solution_> {
 
-    protected final GenuineVariableDescriptor variableDescriptor;
+    protected final GenuineVariableDescriptor<Solution_> variableDescriptor;
+    // TODO remove me to enable multithreaded solving, but first fix https://issues.jboss.org/browse/PLANNER-1250
     protected final SingletonInverseVariableSupply inverseVariableSupply;
     protected final AnchorVariableSupply anchorVariableSupply;
 
     protected final Object entity;
     protected final Object[] values;
 
-    public KOptMove(GenuineVariableDescriptor variableDescriptor,
+    public KOptMove(GenuineVariableDescriptor<Solution_> variableDescriptor,
             SingletonInverseVariableSupply inverseVariableSupply, AnchorVariableSupply anchorVariableSupply,
             Object entity, Object[] values) {
         this.variableDescriptor = variableDescriptor;
@@ -47,6 +51,10 @@ public class KOptMove extends AbstractMove {
         this.anchorVariableSupply = anchorVariableSupply;
         this.entity = entity;
         this.values = values;
+    }
+
+    public String getVariableName() {
+        return variableDescriptor.getVariableName();
     }
 
     public Object getEntity() {
@@ -66,7 +74,7 @@ public class KOptMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<Solution_> scoreDirector) {
         Object firstAnchor = anchorVariableSupply.getAnchor(entity);
         Object firstValue = variableDescriptor.getValue(entity);
         Object formerAnchor = firstAnchor;
@@ -101,18 +109,18 @@ public class KOptMove extends AbstractMove {
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public KOptMove<Solution_> createUndoMove(ScoreDirector<Solution_> scoreDirector) {
         Object[] undoValues = new Object[values.length];
         undoValues[0] = variableDescriptor.getValue(entity);
         for (int i = 1; i < values.length; i++) {
             undoValues[i] = values[values.length - i];
         }
-        return new KOptMove(variableDescriptor, inverseVariableSupply, anchorVariableSupply,
+        return new KOptMove<>(variableDescriptor, inverseVariableSupply, anchorVariableSupply,
                 entity, undoValues);
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<Solution_> scoreDirector) {
         Object firstValue = variableDescriptor.getValue(entity);
         Object formerEntity = entity;
         for (int i = 0; i < values.length; i++) {
@@ -125,6 +133,14 @@ public class KOptMove extends AbstractMove {
         if (formerEntity != null) {
             scoreDirector.changeVariableFacade(variableDescriptor, formerEntity, firstValue);
         }
+    }
+
+    @Override
+    public KOptMove<Solution_> rebase(ScoreDirector<Solution_> destinationScoreDirector) {
+        throw new UnsupportedOperationException("https://issues.jboss.org/browse/PLANNER-1250"); // TODO test also disabled
+//        return new KOptMove<>(variableDescriptor, inverseVariableSupply, anchorVariableSupply,
+//                destinationScoreDirector.lookUpWorkingObject(entity),
+//                rebaseArray(values, destinationScoreDirector));
     }
 
     // ************************************************************************
@@ -155,11 +171,12 @@ public class KOptMove extends AbstractMove {
         return allValueList;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         } else if (o instanceof KOptMove) {
-            KOptMove other = (KOptMove) o;
+            KOptMove<?> other = (KOptMove) o;
             return new EqualsBuilder()
                     .append(entity, other.entity)
                     .append(values, other.values)
@@ -169,6 +186,7 @@ public class KOptMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(entity)
@@ -176,6 +194,7 @@ public class KOptMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         Object leftValue = variableDescriptor.getValue(entity);
         StringBuilder builder = new StringBuilder(80 * values.length);

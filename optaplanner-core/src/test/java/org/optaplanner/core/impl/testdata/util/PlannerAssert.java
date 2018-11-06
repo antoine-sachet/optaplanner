@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.function.Function;
 
 import org.junit.Assert;
 import org.junit.ComparisonFailure;
@@ -63,11 +62,11 @@ public class PlannerAssert extends Assert {
     // Missing JUnit methods
     // ************************************************************************
 
-    public static void assertInstanceOf(Class expectedClass, Object actualInstance) {
+    public static void assertInstanceOf(Class<?> expectedClass, Object actualInstance) {
         assertInstanceOf(null, expectedClass, actualInstance);
     }
 
-    public static void assertInstanceOf(String message, Class expectedClass, Object actualInstance) {
+    public static void assertInstanceOf(String message, Class<?> expectedClass, Object actualInstance) {
         if (!expectedClass.isInstance(actualInstance)) {
             String cleanMessage = message == null ? "" : message;
             throw new ComparisonFailure(cleanMessage, expectedClass.getName(),
@@ -75,11 +74,11 @@ public class PlannerAssert extends Assert {
         }
     }
 
-    public static void assertNotInstanceOf(Class expectedClass, Object actualInstance) {
+    public static void assertNotInstanceOf(Class<?> expectedClass, Object actualInstance) {
         assertNotInstanceOf(null, expectedClass, actualInstance);
     }
 
-    public static void assertNotInstanceOf(String message, Class expectedClass, Object actualInstance) {
+    public static void assertNotInstanceOf(String message, Class<?> expectedClass, Object actualInstance) {
         if (expectedClass.isInstance(actualInstance)) {
             String cleanMessage = message == null ? "" : message;
             throw new ComparisonFailure(cleanMessage, "not " + expectedClass.getName(),
@@ -87,41 +86,68 @@ public class PlannerAssert extends Assert {
         }
     }
 
-    public static <C extends Comparable<C>> void assertCompareToOrder(C... comparables) {
-        assertCompareToOrder(Comparator.naturalOrder(), comparables);
-    }
-
-    public static <T> void assertCompareToOrder(Comparator<T> comperator, T... objects) {
+    @SafeVarargs
+    public static <C extends Comparable<C>> void assertObjectsAreEqual(C... objects) {
         for (int i = 0; i < objects.length; i++) {
             for (int j = i + 1; j < objects.length; j++) {
-                T a = objects[i];
-                T b = objects[j];
-                assertTrue("Object (" + a + ") must be lesser than object (" + b + ").", comperator.compare(a, b) < 0);
-                assertTrue("Object (" + b + ") must be greater than object (" + a + ").", comperator.compare(b, a) > 0);
+                assertEquals(objects[i], objects[j]);
+                assertEquals(objects[i].hashCode(), objects[j].hashCode());
+                assertEquals(0, objects[i].compareTo(objects[j]));
             }
         }
     }
 
+    @SafeVarargs
+    public static <C extends Comparable<C>> void assertObjectsAreNotEqual(C... objects) {
+        for (int i = 0; i < objects.length; i++) {
+            for (int j = i + 1; j < objects.length; j++) {
+                assertNotEquals(objects[i], objects[j]);
+                assertNotEquals(0, objects[i].compareTo(objects[j]));
+            }
+        }
+    }
+
+    @SafeVarargs
+    public static <C extends Comparable<C>> void assertCompareToOrder(C... objects) {
+        assertCompareToOrder(Comparator.naturalOrder(), objects);
+    }
+
+    @SafeVarargs
+    public static <T> void assertCompareToOrder(Comparator<T> comparator, T... objects) {
+        for (int i = 0; i < objects.length; i++) {
+            for (int j = i + 1; j < objects.length; j++) {
+                T a = objects[i];
+                T b = objects[j];
+                assertTrue("Object (" + a + ") must be lesser than object (" + b + ").", comparator.compare(a, b) < 0);
+                assertTrue("Object (" + b + ") must be greater than object (" + a + ").", comparator.compare(b, a) > 0);
+            }
+        }
+    }
+
+    @SafeVarargs
     public static <C extends Comparable<C>> void assertCompareToEquals(C... comparables) {
         assertCompareToEquals(Comparator.naturalOrder(), comparables);
     }
 
-    public static <T> void assertCompareToEquals(Comparator<T> comperator, T... objects) {
+    @SafeVarargs
+    public static <T> void assertCompareToEquals(Comparator<T> comparator, T... objects) {
         for (int i = 0; i < objects.length; i++) {
             for (int j = i + 1; j < objects.length; j++) {
                 T a = objects[i];
                 T b = objects[j];
-                assertTrue("Object (" + a + ") must compare equal to object (" + b + ").", comperator.compare(a, b) == 0);
-                assertTrue("Object (" + b + ") must compare equal to object (" + a + ").", comperator.compare(b, a) == 0);
+                assertTrue("Object (" + a + ") must compare equal to object (" + b + ").", comparator.compare(a, b) == 0);
+                assertTrue("Object (" + b + ") must compare equal to object (" + a + ").", comparator.compare(b, a) == 0);
             }
         }
     }
 
+    @SafeVarargs
     public static <E> void assertCollectionContainsExactly(Collection<E> collection, E... elements) {
         assertCollectionContains(collection, elements);
         assertEquals(elements.length, collection.size());
     }
 
+    @SafeVarargs
     public static <E> void assertCollectionContains(Collection<E> collection, E... elements) {
         for (int i = 0; i < elements.length; i++) {
             if (!collection.contains(elements[i])) {
@@ -131,11 +157,27 @@ public class PlannerAssert extends Assert {
         }
     }
 
+    public static <E> void assertListElementsSameExactly(List<E> expectedList, List<E> actualList) {
+        assertEquals(expectedList.size(), actualList.size());
+        for (int i = 0; i < expectedList.size(); i++) {
+            assertSame(expectedList.get(i), actualList.get(i));
+        }
+    }
+
+    public static <E> void assertArrayElementsSameExactly(E[] expectedArray, E[] actualArray) {
+        assertEquals(expectedArray.length, actualArray.length);
+        for (int i = 0; i < expectedArray.length; i++) {
+            assertSame(expectedArray[i], actualArray[i]);
+        }
+    }
+
+    @SafeVarargs
     public static <K, V> void assertMapContainsKeysExactly(Map<K, V> map, K... keys) {
         assertMapContainsKeys(map, keys);
         assertEquals(keys.length, map.size());
     }
 
+    @SafeVarargs
     public static <K, V> void assertMapContainsKeys(Map<K, V> map, K... keys) {
         for (int i = 0; i < keys.length; i++) {
             if (!map.containsKey(keys[i])) {
@@ -179,6 +221,7 @@ public class PlannerAssert extends Assert {
         verify(phaseLifecycleListener, times(solvingCount)).solvingEnded(Matchers.<DefaultSolverScope>any());
     }
 
+    @SafeVarargs
     public static <O> void assertElementsOfIterator(Iterator<O> iterator, O... elements) {
         assertNotNull(iterator);
         for (O element : elements) {
@@ -187,6 +230,7 @@ public class PlannerAssert extends Assert {
         }
     }
 
+    @SafeVarargs
     public static <O> void assertAllElementsOfIterator(Iterator<O> iterator, O... elements) {
         assertElementsOfIterator(iterator, elements);
         assertFalse(iterator.hasNext());
@@ -208,40 +252,25 @@ public class PlannerAssert extends Assert {
         if (o instanceof CodeAssertable) {
             return (CodeAssertable) o;
         } else if (o instanceof ChangeMove) {
-            ChangeMove changeMove = (ChangeMove) o;
+            ChangeMove<?> changeMove = (ChangeMove) o;
             final String code = convertToCodeAssertable(changeMove.getEntity()).getCode()
                     + "->" + convertToCodeAssertable(changeMove.getToPlanningValue()).getCode();
-            return new CodeAssertable() {
-                @Override
-                public String getCode() {
-                    return code;
-                }
-            };
+            return () -> code;
         } else if (o instanceof SwapMove) {
-            SwapMove swapMove = (SwapMove) o;
+            SwapMove<?> swapMove = (SwapMove) o;
             final String code = convertToCodeAssertable(swapMove.getLeftEntity()).getCode()
                     + "<->" + convertToCodeAssertable(swapMove.getRightEntity()).getCode();
-            return new CodeAssertable() {
-                @Override
-                public String getCode() {
-                    return code;
-                }
-            };
+            return () -> code;
         } else if (o instanceof CompositeMove) {
-            CompositeMove compositeMove = (CompositeMove) o;
+            CompositeMove<?> compositeMove = (CompositeMove) o;
             StringBuilder codeBuilder = new StringBuilder(compositeMove.getMoves().length * 80);
-            for (Move move : compositeMove.getMoves()) {
+            for (Move<?> move : compositeMove.getMoves()) {
                 codeBuilder.append("+").append(convertToCodeAssertable(move).getCode());
             }
             final String code = codeBuilder.substring(1);
-            return new CodeAssertable() {
-                @Override
-                public String getCode() {
-                    return code;
-                }
-            };
+            return () -> code;
         } else if (o instanceof List) {
-            List list = (List) o;
+            List<?> list = (List) o;
             StringBuilder codeBuilder = new StringBuilder("[");
             boolean firstElement = true;
             for (Object element : list) {
@@ -254,21 +283,11 @@ public class PlannerAssert extends Assert {
             }
             codeBuilder.append("]");
             final String code = codeBuilder.toString();
-            return new CodeAssertable() {
-                @Override
-                public String getCode() {
-                    return code;
-                }
-            };
+            return () -> code;
         } else if (o instanceof SubChain) {
             SubChain subChain = (SubChain) o;
             final String code = convertToCodeAssertable(subChain.getEntityList()).getCode();
-            return new CodeAssertable() {
-                @Override
-                public String getCode() {
-                    return code;
-                }
-            };
+            return () -> code;
         }
         throw new AssertionError(("o's class (" + o.getClass() + ") cannot be converted to CodeAssertable."));
     }
@@ -306,7 +325,9 @@ public class PlannerAssert extends Assert {
     public static <O> void assertCodesOfIterator(Iterator<O> iterator, String... codes) {
         assertNotNull(iterator);
         for (String code : codes) {
-            assertTrue(iterator.hasNext());
+            if (!iterator.hasNext()) {
+                fail("The asserted iterator ends too soon, instead it should return selection (" + code + ").");
+            }
             assertCode(code, iterator.next());
         }
     }
@@ -314,6 +335,10 @@ public class PlannerAssert extends Assert {
     public static <O> void assertAllCodesOfIterator(Iterator<O> iterator, String... codes) {
         assertCodesOfIterator(iterator, codes);
         assertFalse(iterator.hasNext());
+    }
+
+    public static <O> void assertAllCodesOfCollection(Collection<O> collection, String... codes) {
+        assertAllCodesOfIterator(collection.iterator(), codes);
     }
 
     public static void assertAllCodesOfMoveSelector(MoveSelector moveSelector, String... codes) {

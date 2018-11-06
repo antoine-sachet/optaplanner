@@ -18,6 +18,7 @@ package org.optaplanner.core.impl.solver.termination;
 
 import org.optaplanner.core.impl.phase.scope.AbstractPhaseScope;
 import org.optaplanner.core.impl.phase.scope.AbstractStepScope;
+import org.optaplanner.core.impl.solver.ChildThreadType;
 import org.optaplanner.core.impl.solver.scope.DefaultSolverScope;
 
 public class PhaseToSolverTerminationBridge extends AbstractTermination {
@@ -39,22 +40,22 @@ public class PhaseToSolverTerminationBridge extends AbstractTermination {
 
     @Override
     public void phaseStarted(AbstractPhaseScope phaseScope) {
-        // Do not delegate the event to the solverTermination, because it already gets the event from the DefaultSolver
+        solverTermination.phaseStarted(phaseScope);
     }
 
     @Override
     public void stepStarted(AbstractStepScope stepScope) {
-        // Do not delegate the event to the solverTermination, because it already gets the event from the DefaultSolver
+        solverTermination.stepStarted(stepScope);
     }
 
     @Override
     public void stepEnded(AbstractStepScope stepScope) {
-        // Do not delegate the event to the solverTermination, because it already gets the event from the DefaultSolver
+        solverTermination.stepEnded(stepScope);
     }
 
     @Override
     public void phaseEnded(AbstractPhaseScope phaseScope) {
-        // Do not delegate the event to the solverTermination, because it already gets the event from the DefaultSolver
+        solverTermination.phaseStarted(phaseScope);
     }
 
     @Override
@@ -90,6 +91,26 @@ public class PhaseToSolverTerminationBridge extends AbstractTermination {
     @Override
     public double calculatePhaseTimeGradient(AbstractPhaseScope phaseScope) {
         return solverTermination.calculateSolverTimeGradient(phaseScope.getSolverScope());
+    }
+
+    // ************************************************************************
+    // Other methods
+    // ************************************************************************
+
+    @Override
+    public Termination createChildThreadTermination(
+            DefaultSolverScope solverScope, ChildThreadType childThreadType) {
+        if (childThreadType == ChildThreadType.PART_THREAD) {
+            // Remove of the bridge (which is nested if there's a phase termination), PhaseConfig will add it again
+            return solverTermination.createChildThreadTermination(solverScope, childThreadType);
+        } else {
+            throw new IllegalStateException("The childThreadType (" + childThreadType + ") is not implemented.");
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "Bridge(" + solverTermination + ")";
     }
 
 }

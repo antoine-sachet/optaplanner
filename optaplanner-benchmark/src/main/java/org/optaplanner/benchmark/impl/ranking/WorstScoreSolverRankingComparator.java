@@ -17,7 +17,6 @@
 package org.optaplanner.benchmark.impl.ranking;
 
 import java.io.Serializable;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -31,15 +30,15 @@ import org.optaplanner.core.api.score.Score;
  */
 public class WorstScoreSolverRankingComparator implements Comparator<SolverBenchmarkResult>, Serializable {
 
-    private final Comparator<SingleBenchmarkResult> singleBenchmarkComparator = new SingleBenchmarkRankingComparator();
+    private final Comparator<SingleBenchmarkResult> singleBenchmarkComparator = new TotalScoreSingleBenchmarkRankingComparator();
 
     @Override
     public int compare(SolverBenchmarkResult a, SolverBenchmarkResult b) {
         List<SingleBenchmarkResult> aSingleBenchmarkResultList = a.getSingleBenchmarkResultList();
         List<SingleBenchmarkResult> bSingleBenchmarkResultList = b.getSingleBenchmarkResultList();
         // Order scores from worst to best
-        Collections.sort(aSingleBenchmarkResultList, singleBenchmarkComparator);
-        Collections.sort(bSingleBenchmarkResultList, singleBenchmarkComparator);
+        aSingleBenchmarkResultList.sort(singleBenchmarkComparator);
+        bSingleBenchmarkResultList.sort(singleBenchmarkComparator);
         int aSize = aSingleBenchmarkResultList.size();
         int bSize = bSingleBenchmarkResultList.size();
         for (int i = 0; i < aSize && i < bSize; i++) {

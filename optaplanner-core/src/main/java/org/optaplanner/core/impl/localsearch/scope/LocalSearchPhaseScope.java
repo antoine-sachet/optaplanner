@@ -29,7 +29,7 @@ public class LocalSearchPhaseScope<Solution_> extends AbstractPhaseScope<Solutio
 
     public LocalSearchPhaseScope(DefaultSolverScope<Solution_> solverScope) {
         super(solverScope);
-        lastCompletedStepScope = new LocalSearchStepScope(this, -1);
+        lastCompletedStepScope = new LocalSearchStepScope<>(this, -1);
         lastCompletedStepScope.setTimeGradient(0.0);
     }
 

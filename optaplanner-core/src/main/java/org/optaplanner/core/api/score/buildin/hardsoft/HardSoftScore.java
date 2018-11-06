@@ -23,12 +23,14 @@ import org.optaplanner.core.api.score.Score;
 /**
  * This {@link Score} is based on 2 levels of int constraints: hard and soft.
  * Hard constraints have priority over soft constraints.
+ * Hard constraints determine feasibility.
  * <p>
  * This class is immutable.
  * @see Score
  */
 public final class HardSoftScore extends AbstractScore<HardSoftScore> implements FeasibilityScore<HardSoftScore> {
 
+    public static final HardSoftScore ZERO = new HardSoftScore(0, 0, 0);
     private static final String HARD_LABEL = "hard";
     private static final String SOFT_LABEL = "soft";
 
@@ -37,15 +39,39 @@ public final class HardSoftScore extends AbstractScore<HardSoftScore> implements
         int initScore = parseInitScore(HardSoftScore.class, scoreString, scoreTokens[0]);
         int hardScore = parseLevelAsInt(HardSoftScore.class, scoreString, scoreTokens[1]);
         int softScore = parseLevelAsInt(HardSoftScore.class, scoreString, scoreTokens[2]);
-        return valueOf(initScore, hardScore, softScore);
+        return ofUninitialized(initScore, hardScore, softScore);
     }
 
-    public static HardSoftScore valueOf(int initScore, int hardScore, int softScore) {
+    public static HardSoftScore ofUninitialized(int initScore, int hardScore, int softScore) {
         return new HardSoftScore(initScore, hardScore, softScore);
     }
 
-    public static HardSoftScore valueOfInitialized(int hardScore, int softScore) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, int, int)}
+     */
+    @Deprecated
+    public static HardSoftScore valueOfUninitialized(int initScore, int hardScore, int softScore) {
+        return new HardSoftScore(initScore, hardScore, softScore);
+    }
+
+    public static HardSoftScore of(int hardScore, int softScore) {
         return new HardSoftScore(0, hardScore, softScore);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(int, int)}
+     */
+    @Deprecated
+    public static HardSoftScore valueOf(int hardScore, int softScore) {
+        return new HardSoftScore(0, hardScore, softScore);
+    }
+
+    public static HardSoftScore ofHard(int hardScore) {
+        return new HardSoftScore(0, hardScore, 0);
+    }
+
+    public static HardSoftScore ofSoft(int softScore) {
+        return new HardSoftScore(0, 0, softScore);
     }
 
     // ************************************************************************
@@ -105,6 +131,12 @@ public final class HardSoftScore extends AbstractScore<HardSoftScore> implements
     }
 
     @Override
+    public HardSoftScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new HardSoftScore(newInitScore, hardScore, softScore);
+    }
+
+    @Override
     public boolean isFeasible() {
         return initScore >= 0 && hardScore >= 0;
     }
@@ -159,6 +191,7 @@ public final class HardSoftScore extends AbstractScore<HardSoftScore> implements
         return new Number[]{hardScore, softScore};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -173,10 +206,11 @@ public final class HardSoftScore extends AbstractScore<HardSoftScore> implements
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return ((((17 * 37)
-                + initScore)) * 37
+        return (((17 * 37)
+                + initScore) * 37
                 + hardScore) * 37
                 + softScore;
     }
@@ -194,8 +228,18 @@ public final class HardSoftScore extends AbstractScore<HardSoftScore> implements
     }
 
     @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((Integer) n).intValue() != 0, HARD_LABEL, SOFT_LABEL);
+    }
+
+    @Override
     public String toString() {
         return getInitPrefix() + hardScore + HARD_LABEL + "/" + softScore + SOFT_LABEL;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof HardSoftScore;
     }
 
 }

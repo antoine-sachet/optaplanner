@@ -19,7 +19,9 @@ package org.optaplanner.core.api.domain.solution;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import org.optaplanner.core.api.domain.solution.cloner.PlanningCloneable;
+import org.optaplanner.core.api.domain.autodiscover.AutoDiscoverMemberType;
+import org.optaplanner.core.api.domain.constraintweight.ConstraintConfigurationProvider;
+import org.optaplanner.core.api.domain.lookup.LookUpStrategyType;
 import org.optaplanner.core.api.domain.solution.cloner.SolutionCloner;
 import org.optaplanner.core.api.domain.solution.drools.ProblemFactCollectionProperty;
 import org.optaplanner.core.api.domain.solution.drools.ProblemFactProperty;
@@ -38,10 +40,12 @@ import static java.lang.annotation.RetentionPolicy.*;
  * the same solution instance (called the working solution per move thread) is continuously modified.
  * It's cloned to recall the best solution.
  * <p>
- * Each planning solution must have at exactly 1 {@link PlanningScore} property.
+ * Each planning solution must have exactly 1 {@link PlanningScore} property.
  * <p>
  * Each planning solution must have at least 1 {@link PlanningEntityCollectionProperty}
  * or {@link PlanningEntityProperty} property.
+ * <p>
+ * Each planning solution is recommended to have 1 {@link ConstraintConfigurationProvider} property too.
  * <p>
  * Each planning solution used with Drools score calculation must have at least 1 {@link ProblemFactCollectionProperty}
  * or {@link ProblemFactProperty} property.
@@ -54,10 +58,19 @@ import static java.lang.annotation.RetentionPolicy.*;
 public @interface PlanningSolution {
 
     /**
+     * Enable reflection through the members of the class
+     * to automatically assume {@link PlanningScore}, {@link PlanningEntityCollectionProperty},
+     * {@link PlanningEntityProperty}, {@link ProblemFactCollectionProperty}, {@link ProblemFactProperty}
+     * and {@link ConstraintConfigurationProvider} annotations based on the member type.
+     * @return never null
+     */
+    AutoDiscoverMemberType autoDiscoverMemberType() default AutoDiscoverMemberType.NONE;
+
+    /**
      * Overrides the default {@link SolutionCloner} to implement a custom {@link PlanningSolution} cloning implementation.
      * <p>
-     * If this is not specified and the {@link PlanningSolution} does not implements {@link PlanningCloneable},
-     * the default reflection-based {@link SolutionCloner} is used, so you don't have to worry about it.
+     * If this is not specified, then the default reflection-based {@link SolutionCloner} is used,
+     * so you don't have to worry about it.
      * @return {@link NullSolutionCloner} when it is null (workaround for annotation limitation)
      */
     Class<? extends SolutionCloner> solutionCloner()
@@ -65,5 +78,10 @@ public @interface PlanningSolution {
 
     /** Workaround for annotation limitation in {@link #solutionCloner()}. */
     interface NullSolutionCloner extends SolutionCloner {}
+
+    /**
+     * @return never null
+     */
+    LookUpStrategyType lookUpStrategyType() default LookUpStrategyType.PLANNING_ID_OR_NONE;
 
 }

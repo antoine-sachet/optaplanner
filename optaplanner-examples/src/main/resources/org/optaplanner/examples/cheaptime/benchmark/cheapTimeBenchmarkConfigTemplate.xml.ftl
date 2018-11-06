@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/cheaptime</benchmarkDirectory>
   <!--<parallelBenchmarkCount>AUTO</parallelBenchmarkCount>-->
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -57,21 +56,12 @@
       <inputSolutionFile>data/cheaptime/import/instance47</inputSolutionFile>
       <inputSolutionFile>data/cheaptime/import/instance48</inputSolutionFile>
       <inputSolutionFile>data/cheaptime/import/instance49</inputSolutionFile>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
-      <!--<problemStatisticType>STEP_SCORE</problemStatisticType>-->
-      <!--<problemStatisticType>SCORE_CALCULATION_SPEED</problemStatisticType>-->
-      <!--<problemStatisticType>BEST_SOLUTION_MUTATION</problemStatisticType>-->
-      <!--<problemStatisticType>MOVE_COUNT_PER_STEP</problemStatisticType>-->
-      <!--<problemStatisticType>MEMORY_USE</problemStatisticType>-->
-      <!--<singleStatisticType>PICKED_MOVE_TYPE_BEST_SCORE_DIFF</singleStatisticType>-->
-      <!--<singleStatisticType>PICKED_MOVE_TYPE_STEP_SCORE_DIFF</singleStatisticType>-->
     </problemBenchmarks>
 
     <solver>
       <solutionClass>org.optaplanner.examples.cheaptime.domain.CheapTimeSolution</solutionClass>
       <entityClass>org.optaplanner.examples.cheaptime.domain.TaskAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_MEDIUM_SOFT_LONG</scoreDefinitionType>
         <incrementalScoreCalculatorClass>org.optaplanner.examples.cheaptime.solver.score.CheapTimeIncrementalScoreCalculator</incrementalScoreCalculatorClass>
         <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>
       </scoreDirectorFactory>
@@ -93,14 +83,10 @@
       <localSearch>
         <unionMoveSelector>
           <changeMoveSelector>
-            <valueSelector>
-              <variableName>startPeriod</variableName>
-            </valueSelector>
+            <valueSelector variableName="startPeriod"/>
           </changeMoveSelector>
           <changeMoveSelector>
-            <valueSelector>
-              <variableName>machine</variableName>
-            </valueSelector>
+            <valueSelector variableName="machine"/>
           </changeMoveSelector>
           <swapMoveSelector/>
         </unionMoveSelector>

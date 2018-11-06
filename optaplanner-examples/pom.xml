@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.optaplanner</groupId>
     <artifactId>optaplanner</artifactId>
-    <version>7.0.0-SNAPSHOT</version>
+    <version>7.14.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>optaplanner-examples</artifactId>
@@ -19,9 +19,13 @@
 
     This module contains the non-web examples which demonstrate how to use it in a normal Java application.
   </description>
+  <url>https://www.optaplanner.org</url>
+
+  <properties>
+    <java.module.name>org.optaplanner.examples</java.module.name>
+  </properties>
 
   <repositories>
-    <!-- TODO remove this once maven central replicates the jboss repository -->
     <!-- Included so the examples sources in the distribution zip build out-of-the-box with maven -->
     <repository>
       <id>jboss-public-repository-group</id>
@@ -76,25 +80,37 @@
     </dependency>
     <dependency>
       <groupId>org.optaplanner</groupId>
-      <artifactId>optaplanner-core</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.optaplanner</groupId>
       <artifactId>optaplanner-persistence-common</artifactId>
     </dependency>
-    <dependency>
+    <dependency><!-- Most examples use the XStream integration -->
       <groupId>org.optaplanner</groupId>
       <artifactId>optaplanner-persistence-xstream</artifactId>
+    </dependency>
+    <dependency><!-- TODO add examples that use the JAXB integration -->
+      <groupId>org.optaplanner</groupId>
+      <artifactId>optaplanner-persistence-jaxb</artifactId>
+    </dependency>
+    <dependency><!-- TODO add examples that use the jackson integration -->
+      <groupId>org.optaplanner</groupId>
+      <artifactId>optaplanner-persistence-jackson</artifactId>
     </dependency>
     <dependency>
       <groupId>org.optaplanner</groupId>
       <artifactId>optaplanner-benchmark</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.optaplanner</groupId>
+      <artifactId>optaplanner-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.kie</groupId>
+      <artifactId>kie-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.drools</groupId>
       <artifactId>drools-decisiontables</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <!-- External dependencies -->
     <dependency>
@@ -151,6 +167,17 @@
     <dependency>
       <groupId>org.apache.poi</groupId>
       <artifactId>poi-ooxml</artifactId>
+      <exclusions>
+        <exclusion>
+          <!-- Collides with 'javax.xml.stream:stax-api' brought in by 'org.drools:drools-decisiontables'. -->
+          <groupId>stax</groupId>
+          <artifactId>stax-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish</groupId>
+      <artifactId>javax.json</artifactId>
     </dependency>
   </dependencies>
 

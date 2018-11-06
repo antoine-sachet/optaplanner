@@ -22,11 +22,11 @@ import java.math.RoundingMode;
 import org.optaplanner.core.api.score.AbstractScore;
 import org.optaplanner.core.api.score.FeasibilityScore;
 import org.optaplanner.core.api.score.Score;
-import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 
 /**
  * This {@link Score} is based on 2 levels of {@link BigDecimal} constraints: hard and soft.
  * Hard constraints have priority over soft constraints.
+ * Hard constraints determine feasibility.
  * <p>
  * This class is immutable.
  * @see Score
@@ -34,6 +34,7 @@ import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDecimalScore>
         implements FeasibilityScore<HardSoftBigDecimalScore> {
 
+    public static final HardSoftBigDecimalScore ZERO = new HardSoftBigDecimalScore(0, BigDecimal.ZERO, BigDecimal.ZERO);
     private static final String HARD_LABEL = "hard";
     private static final String SOFT_LABEL = "soft";
 
@@ -42,15 +43,39 @@ public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDeci
         int initScore = parseInitScore(HardSoftBigDecimalScore.class, scoreString, scoreTokens[0]);
         BigDecimal hardScore = parseLevelAsBigDecimal(HardSoftBigDecimalScore.class, scoreString, scoreTokens[1]);
         BigDecimal softScore = parseLevelAsBigDecimal(HardSoftBigDecimalScore.class, scoreString, scoreTokens[2]);
-        return valueOf(initScore, hardScore, softScore);
+        return ofUninitialized(initScore, hardScore, softScore);
     }
 
-    public static HardSoftBigDecimalScore valueOf(int initScore, BigDecimal hardScore, BigDecimal softScore) {
+    public static HardSoftBigDecimalScore ofUninitialized(int initScore, BigDecimal hardScore, BigDecimal softScore) {
         return new HardSoftBigDecimalScore(initScore, hardScore, softScore);
     }
 
-    public static HardSoftBigDecimalScore valueOfInitialized(BigDecimal hardScore, BigDecimal softScore) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, BigDecimal, BigDecimal)}
+     */
+    @Deprecated
+    public static HardSoftBigDecimalScore valueOfUninitialized(int initScore, BigDecimal hardScore, BigDecimal softScore) {
+        return new HardSoftBigDecimalScore(initScore, hardScore, softScore);
+    }
+
+    public static HardSoftBigDecimalScore of(BigDecimal hardScore, BigDecimal softScore) {
         return new HardSoftBigDecimalScore(0, hardScore, softScore);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(BigDecimal, BigDecimal)}
+     */
+    @Deprecated
+    public static HardSoftBigDecimalScore valueOf(BigDecimal hardScore, BigDecimal softScore) {
+        return new HardSoftBigDecimalScore(0, hardScore, softScore);
+    }
+
+    public static HardSoftBigDecimalScore ofHard(BigDecimal hardScore) {
+        return new HardSoftBigDecimalScore(0, hardScore, BigDecimal.ZERO);
+    }
+
+    public static HardSoftBigDecimalScore ofSoft(BigDecimal softScore) {
+        return new HardSoftBigDecimalScore(0, BigDecimal.ZERO, softScore);
     }
 
     // ************************************************************************
@@ -110,6 +135,12 @@ public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDeci
     }
 
     @Override
+    public HardSoftBigDecimalScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new HardSoftBigDecimalScore(newInitScore, hardScore, softScore);
+    }
+
+    @Override
     public boolean isFeasible() {
         return initScore >= 0 && hardScore.compareTo(BigDecimal.ZERO) >= 0;
     }
@@ -164,8 +195,8 @@ public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDeci
         // None of the normal Java libraries support BigDecimal.pow(BigDecimal)
         return new HardSoftBigDecimalScore(
                 (int) Math.floor(Math.pow(initScore, exponent)),
-                hardScore.pow(exponentBigDecimal.intValue()).setScale(hardScore.scale()),
-                softScore.pow(exponentBigDecimal.intValue()).setScale(softScore.scale()));
+                hardScore.pow(exponentBigDecimal.intValue()).setScale(hardScore.scale(), RoundingMode.FLOOR),
+                softScore.pow(exponentBigDecimal.intValue()).setScale(softScore.scale(), RoundingMode.FLOOR));
     }
 
     @Override
@@ -178,6 +209,7 @@ public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDeci
         return new Number[]{hardScore, softScore};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -185,19 +217,20 @@ public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDeci
         } else if (o instanceof HardSoftBigDecimalScore) {
             HardSoftBigDecimalScore other = (HardSoftBigDecimalScore) o;
             return initScore == other.getInitScore()
-                    && hardScore.equals(other.getHardScore())
-                    && softScore.equals(other.getSoftScore());
+                    && hardScore.stripTrailingZeros().equals(other.getHardScore().stripTrailingZeros())
+                    && softScore.stripTrailingZeros().equals(other.getSoftScore().stripTrailingZeros());
         } else {
             return false;
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return ((((17 * 37)
-                + initScore)) * 37
-                + hardScore.hashCode()) * 37
-                + softScore.hashCode();
+        return (((17 * 37)
+                + initScore) * 37
+                + hardScore.stripTrailingZeros().hashCode()) * 37
+                + softScore.stripTrailingZeros().hashCode();
     }
 
     @Override
@@ -215,8 +248,18 @@ public final class HardSoftBigDecimalScore extends AbstractScore<HardSoftBigDeci
     }
 
     @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((BigDecimal) n).compareTo(BigDecimal.ZERO) != 0, HARD_LABEL, SOFT_LABEL);
+    }
+
+    @Override
     public String toString() {
         return getInitPrefix() + hardScore + HARD_LABEL + "/" + softScore + SOFT_LABEL;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof HardSoftBigDecimalScore;
     }
 
 }

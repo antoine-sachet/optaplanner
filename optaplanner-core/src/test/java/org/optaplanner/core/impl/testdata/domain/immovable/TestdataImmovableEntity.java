@@ -17,13 +17,12 @@
 package org.optaplanner.core.impl.testdata.domain.immovable;
 
 import org.optaplanner.core.api.domain.entity.PlanningEntity;
+import org.optaplanner.core.api.domain.entity.PlanningPin;
 import org.optaplanner.core.api.domain.variable.PlanningVariable;
 import org.optaplanner.core.impl.domain.entity.descriptor.EntityDescriptor;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
-import org.optaplanner.core.impl.testdata.domain.TestdataEntity;
 import org.optaplanner.core.impl.testdata.domain.TestdataObject;
 import org.optaplanner.core.impl.testdata.domain.TestdataValue;
-import org.optaplanner.core.impl.testdata.domain.nullable.TestdataNullableSolution;
 
 @PlanningEntity(movableEntitySelectionFilter = TestdataImmovableEntityFilter.class)
 public class TestdataImmovableEntity extends TestdataObject {
@@ -35,6 +34,7 @@ public class TestdataImmovableEntity extends TestdataObject {
 
     private TestdataValue value;
     private boolean locked;
+    private boolean pinned;
 
     public TestdataImmovableEntity() {
     }
@@ -48,9 +48,10 @@ public class TestdataImmovableEntity extends TestdataObject {
         this.value = value;
     }
 
-    public TestdataImmovableEntity(String code, TestdataValue value, boolean locked) {
+    public TestdataImmovableEntity(String code, TestdataValue value, boolean locked, boolean pinned) {
         this(code, value);
         this.locked = locked;
+        this.pinned = pinned;
     }
 
     @PlanningVariable(valueRangeProviderRefs = "valueRange")
@@ -68,6 +69,15 @@ public class TestdataImmovableEntity extends TestdataObject {
 
     public void setLocked(boolean locked) {
         this.locked = locked;
+    }
+
+    @PlanningPin
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
     }
 
     // ************************************************************************

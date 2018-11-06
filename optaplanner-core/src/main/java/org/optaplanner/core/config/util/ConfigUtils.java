@@ -19,9 +19,15 @@ package org.optaplanner.core.config.util;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -30,32 +36,107 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 
+import org.optaplanner.core.api.domain.lookup.PlanningId;
 import org.optaplanner.core.config.AbstractConfig;
 import org.optaplanner.core.impl.domain.common.AlphabeticMemberComparator;
 import org.optaplanner.core.impl.domain.common.ReflectionHelper;
-import org.optaplanner.core.impl.domain.common.accessor.BeanPropertyMemberAccessor;
-import org.optaplanner.core.impl.domain.common.accessor.FieldMemberAccessor;
 import org.optaplanner.core.impl.domain.common.accessor.MemberAccessor;
-import org.optaplanner.core.impl.domain.common.accessor.MethodMemberAccessor;
+import org.optaplanner.core.impl.domain.common.accessor.MemberAccessorFactory;
+
+import static org.optaplanner.core.impl.domain.common.accessor.MemberAccessorFactory.MemberAccessorType.*;
 
 public class ConfigUtils {
+
+    private static final AlphabeticMemberComparator alphabeticMemberComparator = new AlphabeticMemberComparator();
 
     public static <T> T newInstance(Object bean, String propertyName, Class<T> clazz) {
         try {
             return clazz.newInstance();
         } catch (InstantiationException | IllegalAccessException e) {
             throw new IllegalArgumentException("The " + bean.getClass().getSimpleName() + "'s " + propertyName + " ("
-                    + clazz.getName() + ") does not have a public no-arg constructor.", e);
+                    + clazz.getName() + ") does not have a public no-arg constructor"
+                    // Inner classes include local, anonymous and non-static member classes
+                    + ((clazz.isLocalClass() || clazz.isAnonymousClass() || clazz.isMemberClass())
+                    && !Modifier.isStatic(clazz.getModifiers()) ? " because it is an inner class." : "."), e);
         }
+    }
+
+    public static void applyCustomProperties(Object bean, String beanClassPropertyName,
+            Map<String, String> customProperties, String customPropertiesPropertyName) {
+        if (customProperties == null) {
+            return;
+        }
+        Class<?> beanClass = bean.getClass();
+        customProperties.forEach((propertyName, valueString) -> {
+            Method setterMethod = ReflectionHelper.getSetterMethod(beanClass, propertyName);
+            if (setterMethod == null) {
+                throw new IllegalStateException("The custom property " + propertyName + " (" + valueString
+                        + ") in the " + customPropertiesPropertyName
+                        + " cannot be set on the " + beanClassPropertyName + " (" + beanClass
+                        + ") because that class has no public setter for that property.\n"
+                        + "Maybe add a public setter for that custom property (" + propertyName
+                        + ") on that class (" + beanClass.getSimpleName() + ").\n"
+                        + "Maybe don't configure that custom property " + propertyName + " (" + valueString
+                        + ") in the " + customPropertiesPropertyName + ".");
+            }
+            Class<?> propertyType = setterMethod.getParameterTypes()[0];
+            Object typedValue;
+            try {
+                if (propertyType.equals(String.class)) {
+                    typedValue = valueString;
+                } else if (propertyType.equals(Boolean.TYPE) || propertyType.equals(Boolean.class)) {
+                    typedValue = Boolean.parseBoolean(valueString);
+                } else if (propertyType.equals(Integer.TYPE) || propertyType.equals(Integer.class)) {
+                    typedValue = Integer.parseInt(valueString);
+                } else if (propertyType.equals(Long.TYPE) || propertyType.equals(Long.class)) {
+                    typedValue = Long.parseLong(valueString);
+                } else if (propertyType.equals(Float.TYPE) || propertyType.equals(Float.class)) {
+                    typedValue = Float.parseFloat(valueString);
+                } else if (propertyType.equals(Double.TYPE) || propertyType.equals(Double.class)) {
+                    typedValue = Double.parseDouble(valueString);
+                } else if (propertyType.equals(BigDecimal.class)) {
+                    typedValue = new BigDecimal(valueString);
+                } else if (propertyType.isEnum()) {
+                    typedValue = Enum.valueOf((Class<? extends Enum>) propertyType, valueString);
+                } else {
+                    throw new IllegalStateException("The custom property " + propertyName + " (" + valueString
+                            + ") in the " + customPropertiesPropertyName
+                            + " has an unsupported propertyType (" + propertyType + ") for value (" + valueString + ").");
+                }
+            } catch (NumberFormatException e) {
+                throw new IllegalStateException("The custom property " + propertyName + " (" + valueString
+                        + ") in the " + customPropertiesPropertyName
+                        + " cannot be parsed to the propertyType (" + propertyType
+                        + ") of the setterMethod (" + setterMethod + ").");
+            }
+            try {
+                setterMethod.invoke(bean, typedValue);
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException("The custom property " + propertyName + " (" + valueString
+                        + ") in the " + customPropertiesPropertyName
+                        + " has a setterMethod (" + setterMethod + ") on the beanClass (" + beanClass
+                        + ") that cannot be called for the typedValue (" + typedValue + ").", e);
+            } catch (InvocationTargetException e) {
+                throw new IllegalStateException("The custom property " + propertyName + " (" + valueString
+                        + ") in the " + customPropertiesPropertyName
+                        + " has a setterMethod (" + setterMethod + ") on the beanClass (" + beanClass
+                        + ") that throws an exception for the typedValue (" + typedValue + ").",
+                        e.getCause());
+            }
+        });
     }
 
     public static <C extends AbstractConfig<C>> C inheritConfig(C original, C inherited) {
         if (inherited != null) {
             if (original == null) {
-                original = inherited.newInstance();
+                original = inherited.copyConfig();
+            } else {
+                original.inherit(inherited);
             }
-            original.inherit(inherited);
         }
         return original;
     }
@@ -66,8 +147,7 @@ public class ConfigUtils {
                     + (originalList == null ? 0 : originalList.size()));
             // The inheritedList should be before the originalList
             for (C inherited : inheritedList) {
-                C copy = inherited.newInstance();
-                copy.inherit(inherited);
+                C copy = inherited.copyConfig();
                 mergedList.add(copy);
             }
             if (originalList != null) {
@@ -155,7 +235,7 @@ public class ConfigUtils {
 
     /**
      * Divides and ceils the result without using floating point arithmetic. For floor division,
-     * see {@link #floorDivide(long, long)}.
+     * see {@link Math#floorDiv(long, long)}.
      *
      * @throws ArithmeticException if {@code divisor == 0}
      * @param dividend the dividend
@@ -178,27 +258,34 @@ public class ConfigUtils {
     }
 
     /**
-     * Divides and floors the result without using floating point arithmetic. For ceil division,
-     * see {@link #ceilDivide(int, int)}.
-     *
-     * @throws ArithmeticException if {@code divisor == 0}
-     * @param dividend the dividend
-     * @param divisor the divisor
-     * @return dividend / divisor, floored
+     * Name of the variable that represents {@link Runtime#availableProcessors()}.
      */
-    public static long floorDivide(long dividend, long divisor) { // TODO: Java8: replace with Math#floorDiv(long, long)
-        if (divisor == 0) {
-            throw new ArithmeticException("Cannot divide by zero: " + dividend + "/" + divisor);
+    public static final String AVAILABLE_PROCESSOR_COUNT = "availableProcessorCount";
+
+    public static int resolveThreadPoolSizeScript(String propertyName, String script, String... magicValues) {
+        final String scriptLanguage = "JavaScript";
+        ScriptEngine scriptEngine = new ScriptEngineManager().getEngineByName(scriptLanguage);
+        if (scriptEngine == null) {
+            throw new IllegalStateException("The " + propertyName + " (" + script
+                    + ") could not resolve because the JVM doesn't support scriptLanguage (" + scriptLanguage + ").\n"
+                    + "Maybe try running in a normal JVM.");
         }
-        int correction;
-        if (dividend % divisor == 0) {
-            correction = 0;
-        } else if (Long.signum(dividend) * Long.signum(divisor) < 0) {
-            correction = -1;
-        } else {
-            correction = 0;
+        scriptEngine.put(AVAILABLE_PROCESSOR_COUNT, Runtime.getRuntime().availableProcessors());
+        Object scriptResult;
+        try {
+            scriptResult = scriptEngine.eval(script);
+        } catch (ScriptException e) {
+            throw new IllegalArgumentException("The " + propertyName + " (" + script
+                    + ") is not in magicValues (" + Arrays.toString(magicValues)
+                    + ") and cannot be parsed in " + scriptLanguage
+                    + " with the variables ([" + AVAILABLE_PROCESSOR_COUNT + "]).", e);
         }
-        return (dividend / divisor) + correction;
+        if (!(scriptResult instanceof Number)) {
+            throw new IllegalArgumentException("The " + propertyName + " (" + script
+                    + ") is resolved to scriptResult (" + scriptResult + ") in " + scriptLanguage
+                    + " but is not a " + Number.class.getSimpleName() + ".");
+        }
+        return ((Number) scriptResult).intValue();
     }
 
     // ************************************************************************
@@ -226,13 +313,38 @@ public class ConfigUtils {
      */
     public static List<Member> getDeclaredMembers(Class<?> baseClass) {
         Stream<Field> fieldStream = Stream.of(baseClass.getDeclaredFields())
-                .sorted(new AlphabeticMemberComparator());
+                .sorted(alphabeticMemberComparator);
         Stream<Method> methodStream = Stream.of(baseClass.getDeclaredMethods())
-                .sorted(new AlphabeticMemberComparator());
+                // A bridge method is a generic variant that duplicates a concrete method
+                // Example: "Score getScore()" that duplicates "HardSoftScore getScore()"
+                .filter(method -> !method.isBridge())
+                .sorted(alphabeticMemberComparator);
         return Stream.<Member>concat(fieldStream, methodStream)
-            .collect(Collectors.toList());
+                .collect(Collectors.toList());
     }
 
+    /**
+     * @param baseClass never null
+     * @param annotationClass never null
+     * @return never null, sorted by type (fields before methods), then by {@link AlphabeticMemberComparator}.
+     */
+    public static List<Member> getAllMembers(Class<?> baseClass, Class<? extends Annotation> annotationClass) {
+        Class<?> clazz = baseClass;
+        Stream<Member> memberStream = Stream.empty();
+        while (clazz != null) {
+            Stream<Field> fieldStream = Stream.of(clazz.getDeclaredFields())
+                    .filter(field -> field.isAnnotationPresent(annotationClass))
+                    .sorted(alphabeticMemberComparator);
+            Stream<Method> methodStream = Stream.of(clazz.getDeclaredMethods())
+                    .filter(method -> method.isAnnotationPresent(annotationClass))
+                    .sorted(alphabeticMemberComparator);
+            memberStream = Stream.concat(memberStream, Stream.concat(fieldStream, methodStream));
+            clazz = clazz.getSuperclass();
+        }
+        return memberStream.collect(Collectors.toList());
+    }
+
+    @SafeVarargs
     public static Class<? extends Annotation> extractAnnotationClass(Member member,
             Class<? extends Annotation>... annotations) {
         Class<? extends Annotation> annotationClass = null;
@@ -251,49 +363,67 @@ public class ConfigUtils {
         return annotationClass;
     }
 
-    public static MemberAccessor buildMemberAccessor(Member member, MemberAccessorType memberAccessorType, Class<? extends Annotation> annotationClass) {
-        if (member instanceof Field) {
-            Field field = (Field) member;
-            return new FieldMemberAccessor(field);
-        } else if (member instanceof Method) {
-            Method method = (Method) member;
-            MemberAccessor memberAccessor;
-            switch (memberAccessorType) {
-                case FIELD_OR_READ_METHOD:
-                    if (ReflectionHelper.isGetterMethod(method)) {
-                        memberAccessor = new BeanPropertyMemberAccessor(method);
-                    } else {
-                        ReflectionHelper.assertReadMethod(method, annotationClass);
-                        memberAccessor = new MethodMemberAccessor(method);
-                    }
-                    break;
-                case FIELD_OR_GETTER_METHOD:
-                case FIELD_OR_GETTER_METHOD_WITH_SETTER:
-                    ReflectionHelper.assertGetterMethod(method, annotationClass);
-                    memberAccessor = new BeanPropertyMemberAccessor(method);
-                    break;
-                default:
-                    throw new IllegalStateException("The memberAccessorType (" + memberAccessorType
-                            + ") is not implemented.");
-            }
-            if (memberAccessorType == MemberAccessorType.FIELD_OR_GETTER_METHOD_WITH_SETTER
-                    && !memberAccessor.supportSetter()) {
-                throw new IllegalStateException("The class (" + method.getDeclaringClass()
-                        + ") has a " + annotationClass.getSimpleName()
-                        + " annotated getter method (" + method
-                        + "), but lacks a setter for that property (" + memberAccessor.getName() + ").");
-            }
-            return memberAccessor;
-        } else {
-            throw new IllegalStateException("Impossible state: the member (" + member + ")'s type is not a "
-                    + Field.class.getSimpleName() + " or a " + Method.class.getSimpleName() + ".");
+    public static Class<?> extractCollectionGenericTypeParameter(
+            String parentClassConcept, Class<?> parentClass,
+            Class<?> type, Type genericType,
+            Class<? extends Annotation> annotationClass, String memberName) {
+        if (!(genericType instanceof ParameterizedType)) {
+            throw new IllegalArgumentException("The " + parentClassConcept + " (" + parentClass + ") has a "
+                    + (annotationClass == null ? "auto discovered" : annotationClass.getSimpleName() + " annotated")
+                    + " member (" + memberName
+                    + ") with a member type (" + type
+                    + ") that returns a " + Collection.class.getSimpleName()
+                    + " which has no generic parameters.\n"
+                    + "Maybe the member (" + memberName + ") should return a typed "
+                    + Collection.class.getSimpleName() + ".");
         }
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+        Type[] typeArguments = parameterizedType.getActualTypeArguments();
+        if (typeArguments.length != 1) {
+            throw new IllegalArgumentException("The " + parentClassConcept + " (" + parentClass + ") has a "
+                    + (annotationClass == null ? "auto discovered" : annotationClass.getSimpleName() + " annotated")
+                    + " member (" + memberName
+                    + ") with a member type (" + type
+                    + ") which is parameterized collection with an unsupported number of generic parameters ("
+                    + typeArguments.length + ").");
+        }
+        Type typeArgument = typeArguments[0];
+        if (typeArgument instanceof ParameterizedType) {
+            // Remove the type parameters so it can be cast to a Class
+            typeArgument = ((ParameterizedType) typeArgument).getRawType();
+        }
+        if (!(typeArgument instanceof Class)) {
+            throw new IllegalArgumentException("The " + parentClassConcept + " (" + parentClass + ") has a "
+                    + (annotationClass == null ? "auto discovered" : annotationClass.getSimpleName() + " annotated")
+                    + " member (" + memberName
+                    + ") with a member type (" + type
+                    + ") which is parameterized collection with an unsupported type argument ("
+                    + typeArgument + ").");
+        }
+        return ((Class) typeArgument);
     }
 
-    public enum MemberAccessorType {
-        FIELD_OR_READ_METHOD,
-        FIELD_OR_GETTER_METHOD,
-        FIELD_OR_GETTER_METHOD_WITH_SETTER
+    public static <C> MemberAccessor findPlanningIdMemberAccessor(Class<C> clazz) {
+        List<Member> memberList = getAllMembers(clazz, PlanningId.class);
+        if (memberList.isEmpty()) {
+            return null;
+        }
+        if (memberList.size() > 1) {
+            throw new IllegalArgumentException("The class (" + clazz
+                    + ") has " + memberList.size() + " members (" + memberList + ") with a "
+                    + PlanningId.class.getSimpleName() + " annotation.");
+        }
+        Member member = memberList.get(0);
+        MemberAccessor memberAccessor = MemberAccessorFactory.buildMemberAccessor(member, FIELD_OR_READ_METHOD, PlanningId.class);
+        if (!Comparable.class.isAssignableFrom(memberAccessor.getType())) {
+            throw new IllegalArgumentException("The class (" + clazz
+                    + ") has a member (" + member + ") with a " + PlanningId.class.getSimpleName()
+                    + " annotation that returns a type (" + memberAccessor.getType()
+                    + ") that does not implement " + Comparable.class.getSimpleName() + ".\n"
+                    + "Maybe use an " + Integer.class.getSimpleName()
+                    + " or " + String.class.getSimpleName() + " type instead.");
+        }
+        return memberAccessor;
     }
 
     // ************************************************************************

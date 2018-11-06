@@ -26,10 +26,10 @@ import java.util.List;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamImplicit;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
-import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.optaplanner.benchmark.config.statistic.ProblemStatisticType;
 import org.optaplanner.benchmark.impl.measurement.ScoreDifferencePercentage;
-import org.optaplanner.benchmark.impl.ranking.SubSingleBenchmarkRankingComparator;
+import org.optaplanner.benchmark.impl.ranking.ScoreSubSingleBenchmarkRankingComparator;
+import org.optaplanner.benchmark.impl.ranking.SubSingleBenchmarkRankBasedComparator;
 import org.optaplanner.benchmark.impl.report.BenchmarkReport;
 import org.optaplanner.benchmark.impl.statistic.StatisticUtils;
 import org.optaplanner.benchmark.impl.statistic.SubSingleStatistic;
@@ -37,7 +37,6 @@ import org.optaplanner.core.api.score.FeasibilityScore;
 import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.config.util.ConfigUtils;
-import org.optaplanner.core.impl.score.ScoreUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +46,7 @@ import org.slf4j.LoggerFactory;
 @XStreamAlias("singleBenchmarkResult")
 public class SingleBenchmarkResult implements BenchmarkResult {
 
-    protected static final transient Logger logger = LoggerFactory.getLogger(SingleBenchmarkResult.class);
+    private static final Logger logger = LoggerFactory.getLogger(SingleBenchmarkResult.class);
 
     @XStreamOmitField // Bi-directional relationship restored through BenchmarkResultIO
     private SolverBenchmarkResult solverBenchmarkResult;
@@ -81,9 +80,14 @@ public class SingleBenchmarkResult implements BenchmarkResult {
     // Compared to winningSingleBenchmarkResult in the same ProblemBenchmarkResult (which might not be the overall favorite)
     private Score winningScoreDifference = null;
     private ScoreDifferencePercentage worstScoreDifferencePercentage = null;
+    private Double worstScoreCalculationSpeedDifferencePercentage = null;
 
     // Ranking starts from 0
     private Integer ranking = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public SingleBenchmarkResult(SolverBenchmarkResult solverBenchmarkResult, ProblemBenchmarkResult problemBenchmarkResult) {
         this.solverBenchmarkResult = solverBenchmarkResult;
@@ -171,6 +175,14 @@ public class SingleBenchmarkResult implements BenchmarkResult {
         this.worstScoreDifferencePercentage = worstScoreDifferencePercentage;
     }
 
+    public Double getWorstScoreCalculationSpeedDifferencePercentage() {
+        return worstScoreCalculationSpeedDifferencePercentage;
+    }
+
+    public void setWorstScoreCalculationSpeedDifferencePercentage(Double worstScoreCalculationSpeedDifferencePercentage) {
+        this.worstScoreCalculationSpeedDifferencePercentage = worstScoreCalculationSpeedDifferencePercentage;
+    }
+
     public Integer getRanking() {
         return ranking;
     }
@@ -184,8 +196,9 @@ public class SingleBenchmarkResult implements BenchmarkResult {
         return averageScore;
     }
 
-    public void setAverageScore(Score averageScore) {
-        this.averageScore = averageScore;
+    public void setAverageAndTotalScoreForTesting(Score averageAndTotalScore) {
+        this.averageScore = averageAndTotalScore;
+        this.totalScore = averageAndTotalScore;
     }
 
     public SubSingleBenchmarkResult getMedian() {
@@ -320,23 +333,13 @@ public class SingleBenchmarkResult implements BenchmarkResult {
         }
         List<SubSingleBenchmarkResult> subSingleBenchmarkResultListCopy = new ArrayList<>(subSingleBenchmarkResultList);
         // sort (according to ranking) so that the best subSingle is at index 0
-        Collections.sort(subSingleBenchmarkResultListCopy, new Comparator<SubSingleBenchmarkResult>() {
-            @Override
-            public int compare(SubSingleBenchmarkResult o1, SubSingleBenchmarkResult o2) {
-                return new CompareToBuilder()
-                        .append(o1.hasAnyFailure(), o2.hasAnyFailure())
-                        .append(o1.getRanking(), o2.getRanking())
-                        .toComparison();
-            }
-        });
+        subSingleBenchmarkResultListCopy.sort(new SubSingleBenchmarkRankBasedComparator());
         best = subSingleBenchmarkResultListCopy.get(0);
         worst = subSingleBenchmarkResultListCopy.get(subSingleBenchmarkResultListCopy.size() - 1);
         median = subSingleBenchmarkResultListCopy.get(ConfigUtils.ceilDivide(subSingleBenchmarkResultListCopy.size() - 1, 2));
         usedMemoryAfterInputSolution = median.getUsedMemoryAfterInputSolution();
         timeMillisSpent = median.getTimeMillisSpent();
         scoreCalculationCount = median.getScoreCalculationCount();
-        winningScoreDifference = median.getWinningScoreDifference();
-        worstScoreDifferencePercentage = median.getWorstScoreDifferencePercentage();
     }
 
     private void determineTotalsAndAveragesAndRanking() {
@@ -373,8 +376,8 @@ public class SingleBenchmarkResult implements BenchmarkResult {
     }
 
     private void determineRanking(List<SubSingleBenchmarkResult> rankedSubSingleBenchmarkResultList) {
-        Comparator subSingleBenchmarkRankingComparator = new SubSingleBenchmarkRankingComparator();
-        Collections.sort(rankedSubSingleBenchmarkResultList, Collections.reverseOrder(subSingleBenchmarkRankingComparator));
+        Comparator<SubSingleBenchmarkResult> subSingleBenchmarkRankingComparator = new ScoreSubSingleBenchmarkRankingComparator();
+        rankedSubSingleBenchmarkResultList.sort(Collections.reverseOrder(subSingleBenchmarkRankingComparator));
         int ranking = 0;
         SubSingleBenchmarkResult previousSubSingleBenchmarkResult = null;
         int previousSameRankingCount = 0;
@@ -394,8 +397,9 @@ public class SingleBenchmarkResult implements BenchmarkResult {
     // Merger methods
     // ************************************************************************
 
-    protected static SingleBenchmarkResult createMerge(SolverBenchmarkResult solverBenchmarkResult,
-            ProblemBenchmarkResult problemBenchmarkResult, SingleBenchmarkResult oldResult) {
+    protected static SingleBenchmarkResult createMerge(
+            SolverBenchmarkResult solverBenchmarkResult, ProblemBenchmarkResult problemBenchmarkResult,
+            SingleBenchmarkResult oldResult) {
         SingleBenchmarkResult newResult = new SingleBenchmarkResult(solverBenchmarkResult, problemBenchmarkResult);
         newResult.subSingleBenchmarkResultList = new ArrayList<>(oldResult.getSubSingleBenchmarkResultList().size());
         int subSingleBenchmarkIndex = 0;

@@ -30,7 +30,7 @@
       <!--<inputSolutionFile>data/nurserostering/unsolved/sprint_late08.xml</inputSolutionFile>-->
       <!--<inputSolutionFile>data/nurserostering/unsolved/sprint_late09.xml</inputSolutionFile>-->
       <!--<inputSolutionFile>data/nurserostering/unsolved/sprint_late10.xml</inputSolutionFile>-->
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
+      <!--<problemStatisticType>BEST_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>STEP_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>SCORE_CALCULATION_SPEED</problemStatisticType>-->
       <!--<problemStatisticType>BEST_SOLUTION_MUTATION</problemStatisticType>-->
@@ -46,7 +46,6 @@
       <solutionClass>org.optaplanner.examples.nurserostering.domain.NurseRoster</solutionClass>
       <entityClass>org.optaplanner.examples.nurserostering.domain.ShiftAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/nurserostering/solver/nurseRosteringScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <termination>

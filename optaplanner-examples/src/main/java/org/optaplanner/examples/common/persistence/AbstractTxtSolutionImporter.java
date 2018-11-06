@@ -26,8 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
+import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
 
 /**
  * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
@@ -35,14 +35,6 @@ import org.optaplanner.core.api.domain.solution.PlanningSolution;
 public abstract class AbstractTxtSolutionImporter<Solution_> extends AbstractSolutionImporter<Solution_> {
 
     private static final String DEFAULT_INPUT_FILE_SUFFIX = "txt";
-
-    protected AbstractTxtSolutionImporter(SolutionDao<Solution_> solutionDao) {
-        super(solutionDao);
-    }
-
-    protected AbstractTxtSolutionImporter(boolean withoutDao) {
-        super(withoutDao);
-    }
 
     @Override
     public String getInputFileSuffix() {
@@ -61,10 +53,8 @@ public abstract class AbstractTxtSolutionImporter<Solution_> extends AbstractSol
                 Solution_ solution = txtInputBuilder.readSolution();
                 logger.info("Imported: {}", inputFile);
                 return solution;
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException | IllegalStateException e) {
                 throw new IllegalArgumentException("Exception in inputFile (" + inputFile + ")", e);
-            } catch (IllegalStateException e) {
-                throw new IllegalStateException("Exception in inputFile (" + inputFile + ")", e);
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read the file (" + inputFile.getName() + ").", e);
@@ -72,9 +62,8 @@ public abstract class AbstractTxtSolutionImporter<Solution_> extends AbstractSol
     }
 
     public Solution_ readSolution(URL inputURL) {
-        BufferedReader bufferedReader = null;
-        try {
-            bufferedReader = new BufferedReader(new InputStreamReader(inputURL.openStream(), "UTF-8"));
+        try (BufferedReader bufferedReader = new BufferedReader(
+                new InputStreamReader(inputURL.openStream(), "UTF-8"))) {
             TxtInputBuilder<Solution_> txtInputBuilder = createTxtInputBuilder();
             txtInputBuilder.setInputFile(new File(inputURL.getFile()));
             txtInputBuilder.setBufferedReader(bufferedReader);
@@ -87,8 +76,6 @@ public abstract class AbstractTxtSolutionImporter<Solution_> extends AbstractSol
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read the inputURL (" + inputURL + ").", e);
-        } finally {
-            IOUtils.closeQuietly(bufferedReader);
         }
     }
 
@@ -361,12 +348,15 @@ public abstract class AbstractTxtSolutionImporter<Solution_> extends AbstractSol
                                     + ") has an invalid use of quotes (\").");
                         }
                         String delimiter;
-                        if (delimiterRegex.equals("\\ ")) {
-                            delimiter = " ";
-                        } else if (delimiterRegex.equals("\\,")) {
-                            delimiter = ",";
-                        } else {
-                            throw new IllegalArgumentException("Not supported delimiterRegex (" + delimiterRegex + ")");
+                        switch (delimiterRegex) {
+                            case "\\ ":
+                                delimiter = " ";
+                                break;
+                            case "\\,":
+                                delimiter = ",";
+                                break;
+                            default:
+                                throw new IllegalArgumentException("Not supported delimiterRegex (" + delimiterRegex + ")");
                         }
                         token += delimiter + lineTokens[i];
                     }
@@ -400,13 +390,14 @@ public abstract class AbstractTxtSolutionImporter<Solution_> extends AbstractSol
         }
 
         public boolean parseBooleanFromNumber(String token) {
-            if (token.equals("0")) {
-                return false;
-            } else if (token.equals("1")) {
-                return true;
-            } else {
-                throw new IllegalArgumentException("The token (" + token
-                        + ") is expected to be 0 or 1 representing a boolean.");
+            switch (token) {
+                case "0":
+                    return false;
+                case "1":
+                    return true;
+                default:
+                    throw new IllegalArgumentException("The token (" + token
+                            + ") is expected to be 0 or 1 representing a boolean.");
             }
         }
 

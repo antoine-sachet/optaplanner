@@ -65,7 +65,7 @@ public class CustomShadowVariableDescriptor<Solution_> extends ShadowVariableDes
         if (variableListenerClass == CustomShadowVariable.NullVariableListener.class) {
             variableListenerClass = null;
         }
-        CustomShadowVariable.Source[] sources = shadowVariableAnnotation.sources();
+        PlanningVariableReference[] sources = shadowVariableAnnotation.sources();
         if (variableListenerRef != null) {
             if (variableListenerClass != null || sources.length > 0) {
                 throw new IllegalArgumentException("The entityClass (" + entityDescriptor.getEntityClass()
@@ -98,7 +98,11 @@ public class CustomShadowVariableDescriptor<Solution_> extends ShadowVariableDes
     }
 
     @Override
-    public void linkShadowSources(DescriptorPolicy descriptorPolicy) {
+    public void linkVariableDescriptors(DescriptorPolicy descriptorPolicy) {
+        linkShadowSources(descriptorPolicy);
+    }
+
+    private void linkShadowSources(DescriptorPolicy descriptorPolicy) {
         CustomShadowVariable shadowVariableAnnotation = variableMemberAccessor
                 .getAnnotation(CustomShadowVariable.class);
         PlanningVariableReference variableListenerRef = shadowVariableAnnotation.variableListenerRef();
@@ -143,16 +147,16 @@ public class CustomShadowVariableDescriptor<Solution_> extends ShadowVariableDes
                 throw new IllegalArgumentException("The entityClass (" + entityDescriptor.getEntityClass()
                         + ") has a " + CustomShadowVariable.class.getSimpleName()
                         + " annotated property (" + variableMemberAccessor.getName()
-                        + ") with refVariable (" + refVariableDescriptor + ") that must not be a reference too.");
+                        + ") with refVariable (" + refVariableDescriptor + ") that is a reference itself too.");
             }
             refVariableDescriptor.registerSinkVariableDescriptor(this);
         } else {
-            CustomShadowVariable.Source[] sources = shadowVariableAnnotation.sources();
+            PlanningVariableReference[] sources = shadowVariableAnnotation.sources();
             sourceVariableDescriptorList = new ArrayList<>(sources.length);
-            for (CustomShadowVariable.Source source : sources) {
+            for (PlanningVariableReference source : sources) {
                 EntityDescriptor<Solution_> sourceEntityDescriptor;
                 Class<?> sourceEntityClass = source.entityClass();
-                if (sourceEntityClass.equals(CustomShadowVariable.Source.NullEntityClass.class)) {
+                if (sourceEntityClass.equals(PlanningVariableReference.NullEntityClass.class)) {
                     sourceEntityDescriptor = entityDescriptor;
                 } else {
                     sourceEntityDescriptor = entityDescriptor.getSolutionDescriptor()
@@ -193,6 +197,9 @@ public class CustomShadowVariableDescriptor<Solution_> extends ShadowVariableDes
 
     @Override
     public Class<? extends VariableListener> getVariableListenerClass() {
+        if (isRef()) {
+            return refVariableDescriptor.getVariableListenerClass();
+        }
         return variableListenerClass;
     }
 

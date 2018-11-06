@@ -20,12 +20,10 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import javax.swing.AbstractAction;
 import javax.swing.GroupLayout;
@@ -133,33 +131,33 @@ public class MachineReassignmentPanel extends SolutionPanel<MachineReassignment>
         logger.info("Scheduling delete of machine ({}).", machine);
         doProblemFactChange(scoreDirector -> {
             MachineReassignment machineReassignment = scoreDirector.getWorkingSolution();
+            MrMachine workingMachine = scoreDirector.lookUpWorkingObject(machine);
+            if (workingMachine == null) {
+                // The machine has already been deleted (the UI asked to changed the same machine twice), so do nothing
+                return;
+            }
             // First remove the problem fact from all planning entities that use it
             for (MrProcessAssignment processAssignment : machineReassignment.getProcessAssignmentList()) {
-                if (Objects.equals(processAssignment.getOriginalMachine(), machine)) {
-                    scoreDirector.beforeProblemFactChanged(processAssignment);
+                if (processAssignment.getOriginalMachine() == workingMachine) {
+                    scoreDirector.beforeProblemPropertyChanged(processAssignment);
                     processAssignment.setOriginalMachine(null);
-                    scoreDirector.afterProblemFactChanged(processAssignment);
+                    scoreDirector.afterProblemPropertyChanged(processAssignment);
                 }
-                if (Objects.equals(processAssignment.getMachine(), machine)) {
+                if (processAssignment.getMachine() == workingMachine) {
                     scoreDirector.beforeVariableChanged(processAssignment, "machine");
                     processAssignment.setMachine(null);
                     scoreDirector.afterVariableChanged(processAssignment, "machine");
                 }
             }
-            scoreDirector.triggerVariableListeners();
             // A SolutionCloner does not clone problem fact lists (such as machineList)
             // Shallow clone the machineList so only workingSolution is affected, not bestSolution or guiSolution
-            machineReassignment.setMachineList(new ArrayList<>(machineReassignment.getMachineList()));
+            ArrayList<MrMachine> machineList = new ArrayList<>(machineReassignment.getMachineList());
+            machineReassignment.setMachineList(machineList);
             // Remove it the problem fact itself
-            for (Iterator<MrMachine> it = machineReassignment.getMachineList().iterator(); it.hasNext(); ) {
-                MrMachine workingMachine = it.next();
-                if (Objects.equals(workingMachine, machine)) {
-                    scoreDirector.beforeProblemFactRemoved(workingMachine);
-                    it.remove(); // remove from list
-                    scoreDirector.afterProblemFactRemoved(workingMachine);
-                    break;
-                }
-            }
+            scoreDirector.beforeProblemFactRemoved(workingMachine);
+            machineList.remove(workingMachine);
+            scoreDirector.afterProblemFactRemoved(workingMachine);
+            scoreDirector.triggerVariableListeners();
         });
     }
 

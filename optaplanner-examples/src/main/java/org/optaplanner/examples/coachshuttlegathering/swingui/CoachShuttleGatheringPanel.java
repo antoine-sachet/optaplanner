@@ -24,9 +24,7 @@ import org.optaplanner.examples.common.swingui.SolutionPanel;
 
 public class CoachShuttleGatheringPanel extends SolutionPanel<CoachShuttleGatheringSolution> {
 
-    // TODO Create logo
-    public static final String LOGO_PATH = null;
-//    public static final String LOGO_PATH = "/org/optaplanner/examples/coachshuttlegathering/swingui/coachShuttleGatheringLogo.png";
+    public static final String LOGO_PATH = "/org/optaplanner/examples/coachshuttlegathering/swingui/coachShuttleGatheringLogo.png";
 
     private CoachShuttleGatheringWorldPanel coachShuttleGatheringWorldPanel;
 
@@ -42,11 +40,6 @@ public class CoachShuttleGatheringPanel extends SolutionPanel<CoachShuttleGather
     @Override
     public boolean isWrapInScrollPane() {
         return false;
-    }
-
-    @Override
-    public boolean isRefreshScreenDuringSolving() {
-        return true;
     }
 
     @Override

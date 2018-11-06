@@ -23,21 +23,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import javax.imageio.ImageIO;
 
-import org.apache.commons.io.IOUtils;
 import org.jfree.chart.JFreeChart;
 
 public class GraphSupport {
 
     public static void writeChartToImageFile(JFreeChart chart, File chartFile) {
         BufferedImage chartImage = chart.createBufferedImage(1024, 768);
-        OutputStream out = null;
-        try {
-            out = new FileOutputStream(chartFile);
+        try (OutputStream out = new FileOutputStream(chartFile)) {
             ImageIO.write(chartImage, "png", out);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Problem writing chartFile: " + chartFile, e);
-        } finally {
-            IOUtils.closeQuietly(out);
+            throw new IllegalArgumentException("Failed writing chartFile (" + chartFile + ").", e);
         }
     }
 

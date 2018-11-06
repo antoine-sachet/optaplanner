@@ -16,9 +16,9 @@
 
 package org.optaplanner.core.impl.heuristic.selector.move.generic.chained;
 
+import java.util.Collections;
 import java.util.Iterator;
 
-import com.google.common.collect.Iterators;
 import org.optaplanner.core.impl.domain.variable.inverserelation.SingletonInverseVariableDemand;
 import org.optaplanner.core.impl.domain.variable.inverserelation.SingletonInverseVariableSupply;
 import org.optaplanner.core.impl.domain.variable.supply.SupplyManager;
@@ -121,7 +121,7 @@ public class SubChainChangeMoveSelector extends GenericMoveSelector {
         private OriginalSubChainChangeMoveIterator() {
             subChainIterator = subChainSelector.iterator();
             // Don't do hasNext() in constructor (to avoid upcoming selections breaking mimic recording)
-            valueIterator = Iterators.emptyIterator();
+            valueIterator = Collections.emptyIterator();
         }
 
         @Override
@@ -165,7 +165,7 @@ public class SubChainChangeMoveSelector extends GenericMoveSelector {
             subChainIterator = subChainSelector.iterator();
             valueIterator = valueSelector.iterator();
             // Don't do hasNext() in constructor (to avoid upcoming selections breaking mimic recording)
-            valueIterator = Iterators.emptyIterator();
+            valueIterator = Collections.emptyIterator();
         }
 
         @Override
@@ -192,7 +192,7 @@ public class SubChainChangeMoveSelector extends GenericMoveSelector {
             }
             Object toValue = valueIterator.next();
 
-            boolean reversing = selectReversingMoveToo ? workingRandom.nextBoolean() : false;
+            boolean reversing = selectReversingMoveToo && workingRandom.nextBoolean();
             return reversing
                     ? new SubChainReversingChangeMove(subChain, valueSelector.getVariableDescriptor(), inverseVariableSupply, toValue)
                     : new SubChainChangeMove(subChain, valueSelector.getVariableDescriptor(), inverseVariableSupply, toValue);

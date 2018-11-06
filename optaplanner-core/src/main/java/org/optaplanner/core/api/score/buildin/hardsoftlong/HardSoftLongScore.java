@@ -19,11 +19,11 @@ package org.optaplanner.core.api.score.buildin.hardsoftlong;
 import org.optaplanner.core.api.score.AbstractScore;
 import org.optaplanner.core.api.score.FeasibilityScore;
 import org.optaplanner.core.api.score.Score;
-import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 
 /**
  * This {@link Score} is based on 2 levels of long constraints: hard and soft.
  * Hard constraints have priority over soft constraints.
+ * Hard constraints determine feasibility.
  * <p>
  * This class is immutable.
  * @see Score
@@ -31,6 +31,7 @@ import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 public final class HardSoftLongScore extends AbstractScore<HardSoftLongScore>
         implements FeasibilityScore<HardSoftLongScore> {
 
+    public static final HardSoftLongScore ZERO = new HardSoftLongScore(0, 0L, 0L);
     private static final String HARD_LABEL = "hard";
     private static final String SOFT_LABEL = "soft";
 
@@ -39,15 +40,39 @@ public final class HardSoftLongScore extends AbstractScore<HardSoftLongScore>
         int initScore = parseInitScore(HardSoftLongScore.class, scoreString, scoreTokens[0]);
         long hardScore = parseLevelAsLong(HardSoftLongScore.class, scoreString, scoreTokens[1]);
         long softScore = parseLevelAsLong(HardSoftLongScore.class, scoreString, scoreTokens[2]);
-        return valueOf(initScore, hardScore, softScore);
+        return ofUninitialized(initScore, hardScore, softScore);
     }
 
-    public static HardSoftLongScore valueOf(int initScore, long hardScore, long softScore) {
+    public static HardSoftLongScore ofUninitialized(int initScore, long hardScore, long softScore) {
         return new HardSoftLongScore(initScore, hardScore, softScore);
     }
 
-    public static HardSoftLongScore valueOfInitialized(long hardScore, long softScore) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, long, long)}
+     */
+    @Deprecated
+    public static HardSoftLongScore valueOfUninitialized(int initScore, long hardScore, long softScore) {
+        return new HardSoftLongScore(initScore, hardScore, softScore);
+    }
+
+    public static HardSoftLongScore of(long hardScore, long softScore) {
         return new HardSoftLongScore(0, hardScore, softScore);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(long, long)}
+     */
+    @Deprecated
+    public static HardSoftLongScore valueOf(long hardScore, long softScore) {
+        return new HardSoftLongScore(0, hardScore, softScore);
+    }
+
+    public static HardSoftLongScore ofHard(long hardScore) {
+        return new HardSoftLongScore(0, hardScore, 0L);
+    }
+
+    public static HardSoftLongScore ofSoft(long softScore) {
+        return new HardSoftLongScore(0, 0L, softScore);
     }
 
     // ************************************************************************
@@ -107,6 +132,12 @@ public final class HardSoftLongScore extends AbstractScore<HardSoftLongScore>
     }
 
     @Override
+    public HardSoftLongScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new HardSoftLongScore(newInitScore, hardScore, softScore);
+    }
+
+    @Override
     public boolean isFeasible() {
         return initScore >= 0 && hardScore >= 0L;
     }
@@ -161,6 +192,7 @@ public final class HardSoftLongScore extends AbstractScore<HardSoftLongScore>
         return new Number[]{hardScore, softScore};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -175,10 +207,11 @@ public final class HardSoftLongScore extends AbstractScore<HardSoftLongScore>
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return ((((17 * 37)
-                + initScore)) * 37
+        return (((17 * 37)
+                + initScore) * 37
                 + Long.valueOf(hardScore).hashCode()) * 37
                 + Long.valueOf(softScore).hashCode();
     }
@@ -196,8 +229,18 @@ public final class HardSoftLongScore extends AbstractScore<HardSoftLongScore>
     }
 
     @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((Long) n).longValue() != 0L, HARD_LABEL, SOFT_LABEL);
+    }
+
+    @Override
     public String toString() {
         return getInitPrefix() + hardScore + HARD_LABEL + "/" + softScore + SOFT_LABEL;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof HardSoftLongScore;
     }
 
 }

@@ -21,7 +21,6 @@ import java.util.Arrays;
 import org.optaplanner.core.api.score.AbstractBendableScore;
 import org.optaplanner.core.api.score.FeasibilityScore;
 import org.optaplanner.core.api.score.Score;
-import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 import org.optaplanner.core.impl.score.buildin.bendablelong.BendableLongScoreDefinition;
 
 /**
@@ -52,7 +51,7 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
         for (int i = 0; i < softScores.length; i++) {
             softScores[i] = parseLevelAsLong(BendableLongScore.class, scoreString, scoreTokens[2][i]);
         }
-        return valueOf(initScore, hardScores, softScores);
+        return ofUninitialized(initScore, hardScores, softScores);
     }
 
     /**
@@ -62,7 +61,15 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
      * @param softScores never null, never change that array afterwards: it must be immutable
      * @return never null
      */
-    public static BendableLongScore valueOf(int initScore, long[] hardScores, long[] softScores) {
+    public static BendableLongScore ofUninitialized(int initScore, long[] hardScores, long[] softScores) {
+        return new BendableLongScore(initScore, hardScores, softScores);
+    }
+
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, long[], long[])}
+     */
+    @Deprecated
+    public static BendableLongScore valueOfUninitialized(int initScore, long[] hardScores, long[] softScores) {
         return new BendableLongScore(initScore, hardScores, softScores);
     }
 
@@ -72,8 +79,54 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
      * @param softScores never null, never change that array afterwards: it must be immutable
      * @return never null
      */
-    public static BendableLongScore valueOfInitialized(long[] hardScores, long[] softScores) {
+    public static BendableLongScore of(long[] hardScores, long[] softScores) {
         return new BendableLongScore(0, hardScores, softScores);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(long[], long[])}
+     */
+    @Deprecated
+    public static BendableLongScore valueOf(long[] hardScores, long[] softScores) {
+        return new BendableLongScore(0, hardScores, softScores);
+    }
+
+    /**
+     * Creates a new {@link BendableLongScore}.
+     * @param hardLevelsSize at least 0
+     * @param softLevelsSize at least 0
+     * @return never null
+     */
+    public static BendableLongScore zero(int hardLevelsSize, int softLevelsSize) {
+        return new BendableLongScore(0, new long[hardLevelsSize], new long[softLevelsSize]);
+    }
+
+    /**
+     * Creates a new {@link BendableLongScore}.
+     * @param hardLevelsSize at least 0
+     * @param softLevelsSize at least 0
+     * @param hardLevel at least 0, less than hardLevelsSize
+     * @param hardScore any
+     * @return never null
+     */
+    public static BendableLongScore ofHard(int hardLevelsSize, int softLevelsSize, int hardLevel, long hardScore) {
+        long[] hardScores = new long[hardLevelsSize];
+        hardScores[hardLevel] = hardScore;
+        return new BendableLongScore(0, hardScores, new long[softLevelsSize]);
+    }
+
+    /**
+     * Creates a new {@link BendableLongScore}.
+     * @param hardLevelsSize at least 0
+     * @param softLevelsSize at least 0
+     * @param softLevel at least 0, less than softLevelsSize
+     * @param softScore any
+     * @return never null
+     */
+    public static BendableLongScore ofSoft(int hardLevelsSize, int softLevelsSize, int softLevel, long softScore) {
+        long[] softScores = new long[softLevelsSize];
+        softScores[softLevel] = softScore;
+        return new BendableLongScore(0, new long[hardLevelsSize], softScores);
     }
 
     // ************************************************************************
@@ -106,7 +159,19 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
         this.softScores = softScores;
     }
 
-    // Intentionally no getters for the hardScores or softScores int arrays to guarantee that this class is immutable
+    /**
+     * @return not null, array copy because this class is immutable
+     */
+    public long[] getHardScores() {
+        return Arrays.copyOf(hardScores, hardScores.length);
+    }
+
+    /**
+     * @return not null, array copy because this class is immutable
+     */
+    public long[] getSoftScores() {
+        return Arrays.copyOf(softScores, softScores.length);
+    }
 
     @Override
     public int getHardLevelsSize() {
@@ -121,9 +186,6 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
         return hardScores[index];
     }
 
-    /**
-     * @return {@code >= 0}
-     */
     @Override
     public int getSoftLevelsSize() {
         return softScores.length;
@@ -144,6 +206,12 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
     @Override
     public BendableLongScore toInitializedScore() {
         return initScore == 0 ? this : new BendableLongScore(0, hardScores, softScores);
+    }
+
+    @Override
+    public BendableLongScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new BendableLongScore(newInitScore, hardScores, softScores);
     }
 
     @Override
@@ -169,9 +237,7 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
             return false;
         }
         for (long hardScore : hardScores) {
-            if (hardScore > 0) {
-                return true;
-            } else if (hardScore < 0) {
+            if (hardScore < 0) {
                 return false;
             }
         }
@@ -280,6 +346,7 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
         return levelNumbers;
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -336,6 +403,11 @@ public final class BendableLongScore extends AbstractBendableScore<BendableLongS
             }
         }
         return 0;
+    }
+
+    @Override
+    public String toShortString() {
+        return buildBendableShortString((n) -> ((Long) n).longValue() != 0L);
     }
 
     @Override

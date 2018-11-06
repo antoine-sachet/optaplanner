@@ -19,6 +19,7 @@ package org.optaplanner.core.impl.score.definition;
 import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 import org.optaplanner.core.api.score.holder.ScoreHolder;
+import org.optaplanner.core.impl.score.ScoreUtils;
 import org.optaplanner.core.impl.score.buildin.hardsoft.HardSoftScoreDefinition;
 import org.optaplanner.core.impl.score.director.drools.DroolsScoreDirector;
 import org.optaplanner.core.impl.score.trend.InitializingScoreTrend;
@@ -61,6 +62,28 @@ public interface ScoreDefinition<S extends Score> {
     Class<S> getScoreClass();
 
     /**
+     * The score that represents zero.
+     * @return never null
+     */
+    S getZeroScore();
+
+    /**
+     * @param score never null
+     * @return true if the score is higher or equal to {@link #getZeroScore()}
+     */
+    default boolean isPositiveOrZero(S score) {
+        return score.compareTo(getZeroScore()) >= 0;
+    }
+
+    /**
+     * @param score never null
+     * @return true if the score is lower or equal to {@link #getZeroScore()}
+     */
+    default boolean isNegativeOrZero(S score) {
+        return score.compareTo(getZeroScore()) <= 0;
+    }
+
+    /**
      * Returns a {@link String} representation of the {@link Score}.
      * @param score never null
      * @return never null
@@ -73,13 +96,14 @@ public interface ScoreDefinition<S extends Score> {
      * @param scoreString never null
      * @return never null
      * @see #formatScore(Score)
+     * @see ScoreUtils#parseScore(Class, String)
      */
     S parseScore(String scoreString);
 
     /**
      * The opposite of {@link Score#toLevelNumbers()}.
-     * @param initScore <= 0, managed by OptaPlanner, needed as a parameter in the {@link Score}'s creation method,
-     * see {@link Score#getInitScore()}
+     * @param initScore {@code <= 0}, managed by OptaPlanner, needed as a parameter in the {@link Score}'s creation
+     * method, see {@link Score#getInitScore()}
      * @param levelNumbers never null
      * @return never null
      */

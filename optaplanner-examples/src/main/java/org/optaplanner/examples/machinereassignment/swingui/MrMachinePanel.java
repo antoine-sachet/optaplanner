@@ -21,7 +21,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -93,12 +92,7 @@ public class MrMachinePanel extends JPanel {
         if (machine != null) {
             JButton deleteButton = SwingUtils.makeSmallButton(new JButton("X"));
             deleteButton.setToolTipText("Delete");
-            deleteButton.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    machineReassignmentPanel.deleteMachine(machine);
-                }
-            });
+            deleteButton.addActionListener(e -> machineReassignmentPanel.deleteMachine(machine));
             deleteButton.setToolTipText("Delete");
             labelAndDeletePanel.add(deleteButton, BorderLayout.EAST);
         }

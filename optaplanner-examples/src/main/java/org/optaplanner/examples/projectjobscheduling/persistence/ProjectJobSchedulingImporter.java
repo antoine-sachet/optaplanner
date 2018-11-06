@@ -32,8 +32,9 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.examples.common.persistence.AbstractTxtSolutionImporter;
+import org.optaplanner.examples.common.persistence.SolutionConverter;
+import org.optaplanner.examples.projectjobscheduling.app.ProjectJobSchedulingApp;
 import org.optaplanner.examples.projectjobscheduling.domain.Allocation;
 import org.optaplanner.examples.projectjobscheduling.domain.ExecutionMode;
 import org.optaplanner.examples.projectjobscheduling.domain.Job;
@@ -48,11 +49,9 @@ import org.optaplanner.examples.projectjobscheduling.domain.resource.Resource;
 public class ProjectJobSchedulingImporter extends AbstractTxtSolutionImporter<Schedule> {
 
     public static void main(String[] args) {
-        new ProjectJobSchedulingImporter().convertAll();
-    }
-
-    public ProjectJobSchedulingImporter() {
-        super(new ProjectJobSchedulingDao());
+        SolutionConverter<Schedule> converter = SolutionConverter.createImportConverter(
+                ProjectJobSchedulingApp.DATA_DIR_NAME, new ProjectJobSchedulingImporter(), Schedule.class);
+        converter.convertAll();
     }
 
     @Override
@@ -141,9 +140,7 @@ public class ProjectJobSchedulingImporter extends AbstractTxtSolutionImporter<Sc
         }
 
         private void readProjectFile(Project project, File projectFile) {
-            BufferedReader bufferedReader = null;
-            try {
-                bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(projectFile), "UTF-8"));
+            try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(projectFile), "UTF-8"))) {
                 ProjectFileInputBuilder projectFileInputBuilder = new ProjectFileInputBuilder(schedule, project);
                 projectFileInputBuilder.setInputFile(projectFile);
                 projectFileInputBuilder.setBufferedReader(bufferedReader);
@@ -156,8 +153,6 @@ public class ProjectJobSchedulingImporter extends AbstractTxtSolutionImporter<Sc
                 }
             } catch (IOException e) {
                 throw new IllegalArgumentException("Could not read the projectFile (" + projectFile + ").", e);
-            } finally {
-                IOUtils.closeQuietly(bufferedReader);
             }
         }
 

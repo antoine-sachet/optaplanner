@@ -32,7 +32,7 @@ import org.optaplanner.core.impl.testdata.domain.TestdataValue;
 @Deprecated
 public class TestdataLegacySolution implements Solution<SimpleScore> {
 
-    public static SolutionDescriptor buildSolutionDescriptor() {
+    public static SolutionDescriptor<TestdataLegacySolution> buildSolutionDescriptor() {
         return SolutionDescriptor.buildSolutionDescriptor(TestdataLegacySolution.class, TestdataEntity.class);
     }
 
@@ -43,10 +43,6 @@ public class TestdataLegacySolution implements Solution<SimpleScore> {
     private SimpleScore score;
 
     public TestdataLegacySolution() {}
-
-    public TestdataLegacySolution(String code) {
-        super();
-    }
 
     @ValueRangeProvider(id = "valueRange")
     public List<TestdataValue> getValueList() {

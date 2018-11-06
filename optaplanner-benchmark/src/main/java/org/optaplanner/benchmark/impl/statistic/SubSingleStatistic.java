@@ -33,8 +33,9 @@ import java.util.Map;
 
 import com.thoughtworks.xstream.annotations.XStreamInclude;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.benchmark.impl.report.ReportHelper;
+import org.optaplanner.benchmark.impl.result.PlannerBenchmarkResult;
+import org.optaplanner.benchmark.impl.result.SingleBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.SubSingleBenchmarkResult;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.impl.score.definition.ScoreDefinition;
@@ -79,24 +80,22 @@ public abstract class SubSingleStatistic<Solution_, StatisticPoint_ extends Stat
     }
 
     /**
-     * Used in report.
-     * @return the path to the csv file from report root
+     * @return never null, the relative path from {@link PlannerBenchmarkResult#getBenchmarkReportDirectory()}.
      */
     public String getRelativeCsvFilePath() {
-        return new StringBuilder().append(subSingleBenchmarkResult.getSingleBenchmarkResult().getProblemBenchmarkResult().getProblemReportDirectoryPath())
-                .append(File.separator)
-                .append(subSingleBenchmarkResult.getResultDirectoryName())
-                .append(File.separator)
-                .append(getCsvFilePath())
-                .toString();
+        SingleBenchmarkResult singleBenchmarkResult = subSingleBenchmarkResult.getSingleBenchmarkResult();
+        return singleBenchmarkResult.getProblemBenchmarkResult().getProblemReportDirectoryName() + "/"
+                + singleBenchmarkResult.getResultDirectoryName() + "/"
+                + subSingleBenchmarkResult.getResultDirectoryName() + "/"
+                + getCsvFileName();
     }
 
-    public String getCsvFilePath() {
+    public String getCsvFileName() {
         return getStatisticType().name() + ".csv";
     }
 
     public File getCsvFile() {
-        return new File(subSingleBenchmarkResult.getResultDirectory(), getCsvFilePath());
+        return new File(subSingleBenchmarkResult.getResultDirectory(), getCsvFileName());
     }
 
     // ************************************************************************
@@ -119,9 +118,7 @@ public abstract class SubSingleStatistic<Solution_, StatisticPoint_ extends Stat
 
     private void writeCsvStatisticFile() {
         File csvFile = getCsvFile();
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(new FileOutputStream(csvFile), "UTF-8");
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(csvFile), "UTF-8")) {
             writer.append(getCsvHeader()).append("\n");
             for (StatisticPoint point : getPointList()) {
                 writer.append(point.toCsvLine()).append("\n");
@@ -131,15 +128,13 @@ public abstract class SubSingleStatistic<Solution_, StatisticPoint_ extends Stat
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed writing csvFile (" + csvFile + ").", e);
-        } finally {
-            IOUtils.closeQuietly(writer);
         }
     }
 
     private void readCsvStatisticFile() {
         File csvFile = getCsvFile();
-        ScoreDefinition scoreDefinition = subSingleBenchmarkResult.getSingleBenchmarkResult().getSolverBenchmarkResult().getSolverConfig()
-                .getScoreDirectorFactoryConfig().buildScoreDefinition();
+        ScoreDefinition scoreDefinition = subSingleBenchmarkResult.getSingleBenchmarkResult().getSolverBenchmarkResult()
+                .getScoreDefinition();
         if (!pointList.isEmpty()) {
             throw new IllegalStateException("The pointList with size (" + pointList.size() + ") should be empty.");
         }
@@ -151,9 +146,7 @@ public abstract class SubSingleStatistic<Solution_, StatisticPoint_ extends Stat
                 throw new IllegalStateException("The csvFile (" + csvFile + ") does not exist.");
             }
         }
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(new FileInputStream(csvFile), "UTF-8"));
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(csvFile), "UTF-8"))) {
             String line = reader.readLine();
             if (!getCsvHeader().equals(line)) {
                 throw new IllegalStateException("The read line (" + line
@@ -167,7 +160,7 @@ public abstract class SubSingleStatistic<Solution_, StatisticPoint_ extends Stat
                         continue;
                     }
                     throw new IllegalStateException("SubSingleStatistic (" + this + ") failed even though the "
-                            + "corresponding SinglesubSingleBenchmarkResult (" + subSingleBenchmarkResult + ") is a success.");
+                            + "corresponding subSingleBenchmarkResult (" + subSingleBenchmarkResult + ") is a success.");
                 }
                 List<String> csvLine = StatisticPoint.parseCsvLine(line);
                 // HACK
@@ -190,8 +183,6 @@ public abstract class SubSingleStatistic<Solution_, StatisticPoint_ extends Stat
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed reading csvFile (" + csvFile + ").", e);
-        } finally {
-            IOUtils.closeQuietly(reader);
         }
     }
 

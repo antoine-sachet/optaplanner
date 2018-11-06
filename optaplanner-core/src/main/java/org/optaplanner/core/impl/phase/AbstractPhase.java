@@ -19,6 +19,7 @@ package org.optaplanner.core.impl.phase;
 import java.util.Iterator;
 
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
+import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.impl.domain.entity.descriptor.EntityDescriptor;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
@@ -43,10 +44,10 @@ public abstract class AbstractPhase<Solution_> implements Phase<Solution_> {
 
     protected final transient Logger logger = LoggerFactory.getLogger(getClass());
 
-    protected int phaseIndex = -1;
-
-    protected Termination termination;
-    protected BestSolutionRecaller<Solution_> bestSolutionRecaller;
+    protected final int phaseIndex;
+    protected final String logIndentation;
+    protected final BestSolutionRecaller<Solution_> bestSolutionRecaller;
+    protected final Termination termination;
 
     /** Used for {@link DefaultSolver#addPhaseLifecycleListener(PhaseLifecycleListener)}. */
     protected PhaseLifecycleSupport<Solution_> solverPhaseLifecycleSupport;
@@ -57,24 +58,20 @@ public abstract class AbstractPhase<Solution_> implements Phase<Solution_> {
     protected boolean assertExpectedStepScore = false;
     protected boolean assertShadowVariablesAreNotStaleAfterStep = false;
 
-    public Termination getTermination() {
-        return termination;
+    public AbstractPhase(int phaseIndex, String logIndentation,
+            BestSolutionRecaller<Solution_> bestSolutionRecaller, Termination termination) {
+        this.phaseIndex = phaseIndex;
+        this.logIndentation = logIndentation;
+        this.bestSolutionRecaller = bestSolutionRecaller;
+        this.termination = termination;
     }
 
     public int getPhaseIndex() {
         return phaseIndex;
     }
 
-    public void setPhaseIndex(int phaseIndex) {
-        this.phaseIndex = phaseIndex;
-    }
-
-    public void setTermination(Termination termination) {
-        this.termination = termination;
-    }
-
-    public void setBestSolutionRecaller(BestSolutionRecaller<Solution_> bestSolutionRecaller) {
-        this.bestSolutionRecaller = bestSolutionRecaller;
+    public Termination getTermination() {
+        return termination;
     }
 
     @Override
@@ -146,12 +143,24 @@ public abstract class AbstractPhase<Solution_> implements Phase<Solution_> {
         phaseLifecycleSupport.fireStepStarted(stepScope);
     }
 
+    protected void calculateWorkingStepScore(AbstractStepScope<Solution_> stepScope, Object completedAction) {
+        AbstractPhaseScope<Solution_> phaseScope = stepScope.getPhaseScope();
+        Score score = phaseScope.calculateScore();
+        stepScope.setScore(score);
+        if (assertStepScoreFromScratch) {
+            phaseScope.assertWorkingScoreFromScratch(stepScope.getScore(), completedAction);
+        }
+        if (assertShadowVariablesAreNotStaleAfterStep) {
+            phaseScope.assertShadowVariablesAreNotStale(stepScope.getScore(), completedAction);
+        }
+    }
+
     protected void predictWorkingStepScore(AbstractStepScope<Solution_> stepScope, Object completedAction) {
         AbstractPhaseScope<Solution_> phaseScope = stepScope.getPhaseScope();
         // There is no need to recalculate the score, but we still need to set it
         phaseScope.getSolutionDescriptor().setScore(phaseScope.getWorkingSolution(), stepScope.getScore());
         if (assertStepScoreFromScratch) {
-            phaseScope.assertWorkingScoreFromScratch(stepScope.getScore(), completedAction);
+            phaseScope.assertPredictedScoreFromScratch(stepScope.getScore(), completedAction);
         }
         if (assertExpectedStepScore) {
             phaseScope.assertExpectedWorkingScore(stepScope.getScore(), completedAction);
@@ -198,9 +207,9 @@ public abstract class AbstractPhase<Solution_> implements Phase<Solution_> {
             Solution_ workingSolution = scoreDirector.getWorkingSolution();
             for (Iterator<Object> it = solutionDescriptor.extractAllEntitiesIterator(workingSolution); it.hasNext();) {
                 Object entity = it.next();
-                if (!solutionDescriptor.isEntityInitializedOrImmovable(scoreDirector, entity)) {
-                    EntityDescriptor<Solution_> entityDescriptor
-                            = solutionDescriptor.findEntityDescriptorOrFail(entity.getClass());
+                EntityDescriptor<Solution_> entityDescriptor = solutionDescriptor.findEntityDescriptorOrFail(
+                        entity.getClass());
+                if (!entityDescriptor.isEntityInitializedOrImmovable(scoreDirector, entity)) {
                     String variableRef = null;
                     for (GenuineVariableDescriptor<Solution_> variableDescriptor : entityDescriptor.getGenuineVariableDescriptors()) {
                         if (!variableDescriptor.isInitialized(entity)) {
@@ -211,7 +220,8 @@ public abstract class AbstractPhase<Solution_> implements Phase<Solution_> {
                     throw new IllegalStateException(getPhaseTypeString() + " phase (" + phaseIndex
                             + ") needs to start from an initialized solution, but the planning variable (" + variableRef
                             + ") is uninitialized for the entity (" +  entity + ").\n"
-                            + "  Initialize the solution by configuring a Construction Heuristic phase before this phase.");
+                            + "Maybe there is no Construction Heuristic configured before this phase to initialize the solution.\n"
+                            + "Or maybe the getter/setters of your planning variables in your domain classes aren't implemented correctly.");
                 }
             }
         }

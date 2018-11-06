@@ -21,15 +21,16 @@ import java.util.List;
 import org.optaplanner.core.api.domain.solution.PlanningEntityCollectionProperty;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.domain.valuerange.ValueRangeProvider;
+import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 import org.optaplanner.core.impl.domain.solution.AbstractSolution;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import org.optaplanner.core.impl.testdata.domain.TestdataEntity;
 import org.optaplanner.core.impl.testdata.domain.TestdataValue;
 
 @PlanningSolution
-public class TestdataExtendedAbstractSolution extends AbstractSolution {
+public class TestdataExtendedAbstractSolution extends AbstractSolution<HardSoftScore> {
 
-    public static SolutionDescriptor buildSolutionDescriptor() {
+    public static SolutionDescriptor<TestdataExtendedAbstractSolution> buildSolutionDescriptor() {
         return SolutionDescriptor.buildSolutionDescriptor(TestdataExtendedAbstractSolution.class, TestdataEntity.class);
     }
 
@@ -38,8 +39,7 @@ public class TestdataExtendedAbstractSolution extends AbstractSolution {
 
     private List<TestdataEntity> entityList;
 
-    public TestdataExtendedAbstractSolution(String code) {
-        super();
+    public TestdataExtendedAbstractSolution() {
     }
 
     @ValueRangeProvider(id = "valueRange")

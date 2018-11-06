@@ -35,14 +35,6 @@ public abstract class AbstractXmlSolutionExporter<Solution_> extends AbstractSol
 
     protected static final String DEFAULT_OUTPUT_FILE_SUFFIX = "xml";
 
-    protected AbstractXmlSolutionExporter(SolutionDao<Solution_> solutionDao) {
-        super(solutionDao);
-    }
-
-    protected AbstractXmlSolutionExporter(boolean withoutDao) {
-        super(withoutDao);
-    }
-
     @Override
     public String getOutputFileSuffix() {
         return DEFAULT_OUTPUT_FILE_SUFFIX;
@@ -52,7 +44,7 @@ public abstract class AbstractXmlSolutionExporter<Solution_> extends AbstractSol
 
     @Override
     public void writeSolution(Solution_ solution, File outputFile) {
-        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(outputFile))){
+        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(outputFile))) {
             Document document = new Document();
             XmlOutputBuilder<Solution_> xmlOutputBuilder = createXmlOutputBuilder();
             xmlOutputBuilder.setDocument(document);

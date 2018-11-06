@@ -29,13 +29,12 @@ import org.optaplanner.core.api.domain.valuerange.ValueRange;
 import org.optaplanner.core.impl.domain.valuerange.descriptor.ValueRangeDescriptor;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 
 /**
  * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
  */
-public class SwapMove<Solution_> extends AbstractMove {
+public class SwapMove<Solution_> extends AbstractMove<Solution_> {
 
     protected final List<GenuineVariableDescriptor<Solution_>> variableDescriptorList;
 
@@ -46,6 +45,14 @@ public class SwapMove<Solution_> extends AbstractMove {
         this.variableDescriptorList = variableDescriptorList;
         this.leftEntity = leftEntity;
         this.rightEntity = rightEntity;
+    }
+
+    public List<String> getVariableNameList() {
+        List<String> variableNameList = new ArrayList<>(variableDescriptorList.size());
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : variableDescriptorList) {
+            variableNameList.add(variableDescriptor.getVariableName());
+        }
+        return variableNameList;
     }
 
     public Object getLeftEntity() {
@@ -61,7 +68,7 @@ public class SwapMove<Solution_> extends AbstractMove {
     // ************************************************************************
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<Solution_> scoreDirector) {
         boolean movable = false;
         for (GenuineVariableDescriptor<Solution_> variableDescriptor : variableDescriptorList) {
             Object leftValue = variableDescriptor.getValue(leftEntity);
@@ -70,8 +77,7 @@ public class SwapMove<Solution_> extends AbstractMove {
                 movable = true;
                 if (!variableDescriptor.isValueRangeEntityIndependent()) {
                     ValueRangeDescriptor<Solution_> valueRangeDescriptor = variableDescriptor.getValueRangeDescriptor();
-                    // type cast in order to avoid having to make Move and all its sub-types generic
-                    Solution_ workingSolution = (Solution_) scoreDirector.getWorkingSolution();
+                    Solution_ workingSolution = scoreDirector.getWorkingSolution();
                     ValueRange rightValueRange = valueRangeDescriptor.extractValueRange(workingSolution, rightEntity);
                     if (!rightValueRange.contains(leftValue)) {
                         return false;
@@ -87,13 +93,20 @@ public class SwapMove<Solution_> extends AbstractMove {
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public SwapMove<Solution_> createUndoMove(ScoreDirector<Solution_> scoreDirector) {
         return new SwapMove<>(variableDescriptorList, rightEntity, leftEntity);
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
-        for (GenuineVariableDescriptor variableDescriptor : variableDescriptorList) {
+    public SwapMove<Solution_> rebase(ScoreDirector<Solution_> destinationScoreDirector) {
+        return new SwapMove<>(variableDescriptorList,
+                destinationScoreDirector.lookUpWorkingObject(leftEntity),
+                destinationScoreDirector.lookUpWorkingObject(rightEntity));
+    }
+
+    @Override
+    protected void doMoveOnGenuineVariables(ScoreDirector<Solution_> scoreDirector) {
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : variableDescriptorList) {
             Object oldLeftValue = variableDescriptor.getValue(leftEntity);
             Object oldRightValue = variableDescriptor.getValue(rightEntity);
             if (!Objects.equals(oldLeftValue, oldRightValue)) {
@@ -116,7 +129,7 @@ public class SwapMove<Solution_> extends AbstractMove {
         StringBuilder moveTypeDescription = new StringBuilder(20 * (variableDescriptorList.size() + 1));
         moveTypeDescription.append(getClass().getSimpleName()).append("(");
         String delimiter = "";
-        for (GenuineVariableDescriptor variableDescriptor : variableDescriptorList) {
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : variableDescriptorList) {
             moveTypeDescription.append(delimiter).append(variableDescriptor.getSimpleEntityAndVariableName());
             delimiter = ", ";
         }
@@ -132,18 +145,19 @@ public class SwapMove<Solution_> extends AbstractMove {
     @Override
     public Collection<? extends Object> getPlanningValues() {
         List<Object> values = new ArrayList<>(variableDescriptorList.size() * 2);
-        for (GenuineVariableDescriptor variableDescriptor : variableDescriptorList) {
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : variableDescriptorList) {
             values.add(variableDescriptor.getValue(leftEntity));
             values.add(variableDescriptor.getValue(rightEntity));
         }
         return values;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         } else if (o instanceof SwapMove) {
-            SwapMove other = (SwapMove) o;
+            SwapMove<?> other = (SwapMove) o;
             return new EqualsBuilder()
                     .append(leftEntity, other.leftEntity)
                     .append(rightEntity, other.rightEntity)
@@ -153,6 +167,7 @@ public class SwapMove<Solution_> extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(leftEntity)
@@ -160,6 +175,7 @@ public class SwapMove<Solution_> extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         StringBuilder s = new StringBuilder(variableDescriptorList.size() * 16);
         s.append(leftEntity).append(" {");
@@ -173,7 +189,7 @@ public class SwapMove<Solution_> extends AbstractMove {
 
     protected void appendVariablesToString(StringBuilder s, Object entity) {
         boolean first = true;
-        for (GenuineVariableDescriptor variableDescriptor : variableDescriptorList) {
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : variableDescriptorList) {
             if (!first) {
                 s.append(", ");
             }

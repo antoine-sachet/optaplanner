@@ -28,8 +28,6 @@ import javax.enterprise.context.ApplicationScoped;
 
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.api.solver.SolverFactory;
-import org.optaplanner.core.api.solver.event.BestSolutionChangedEvent;
-import org.optaplanner.core.api.solver.event.SolverEventListener;
 import org.optaplanner.core.config.solver.termination.TerminationConfig;
 import org.optaplanner.examples.vehiclerouting.domain.VehicleRoutingSolution;
 import org.optaplanner.examples.vehiclerouting.persistence.VehicleRoutingImporter;
@@ -53,9 +51,7 @@ public class VehicleRoutingSolverManager implements Serializable {
     public synchronized void init() {
         solverFactory = SolverFactory.createFromXmlResource(SOLVER_CONFIG);
         // Always terminate a solver after 2 minutes
-        TerminationConfig terminationConfig = new TerminationConfig();
-        terminationConfig.setMinutesSpentLimit(2L);
-        solverFactory.getSolverConfig().setTerminationConfig(terminationConfig);
+        solverFactory.getSolverConfig().setTerminationConfig(new TerminationConfig().withMinutesSpentLimit(2L));
         executor = Executors.newFixedThreadPool(2); // Only 2 because the other examples have their own Executor
         // TODO these probably don't need to be thread-safe because all access is synchronized
         sessionSolutionMap = new ConcurrentHashMap<>();
@@ -74,7 +70,11 @@ public class VehicleRoutingSolverManager implements Serializable {
         VehicleRoutingSolution solution = sessionSolutionMap.get(sessionId);
         if (solution == null) {
             URL unsolvedSolutionURL = getClass().getResource(IMPORT_DATASET);
-            solution = (VehicleRoutingSolution) new VehicleRoutingImporter(true)
+            if (unsolvedSolutionURL == null) {
+                throw new IllegalArgumentException("The IMPORT_DATASET (" + IMPORT_DATASET
+                        + ") is not a valid classpath resource.");
+            }
+            solution = (VehicleRoutingSolution) new VehicleRoutingImporter()
                     .readSolution(unsolvedSolutionURL);
             sessionSolutionMap.put(sessionId, solution);
         }

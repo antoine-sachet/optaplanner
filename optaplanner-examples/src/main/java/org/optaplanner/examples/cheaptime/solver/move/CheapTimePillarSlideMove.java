@@ -22,11 +22,11 @@ import java.util.Collections;
 import java.util.List;
 
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
+import org.optaplanner.examples.cheaptime.domain.CheapTimeSolution;
 import org.optaplanner.examples.cheaptime.domain.TaskAssignment;
 
-public class CheapTimePillarSlideMove extends AbstractMove {
+public class CheapTimePillarSlideMove extends AbstractMove<CheapTimeSolution> {
 
     private final List<TaskAssignment> pillar;
     private final int startPeriodDiff;
@@ -37,22 +37,27 @@ public class CheapTimePillarSlideMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<CheapTimeSolution> scoreDirector) {
         return true;
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public CheapTimePillarSlideMove createUndoMove(ScoreDirector<CheapTimeSolution> scoreDirector) {
         return new CheapTimePillarSlideMove(pillar, - startPeriodDiff);
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<CheapTimeSolution> scoreDirector) {
         for (TaskAssignment taskAssignment : pillar) {
             scoreDirector.beforeVariableChanged(taskAssignment, "startPeriod");
             taskAssignment.setStartPeriod(taskAssignment.getStartPeriod() + startPeriodDiff);
             scoreDirector.afterVariableChanged(taskAssignment, "startPeriod");
         }
+    }
+
+    @Override
+    public CheapTimePillarSlideMove rebase(ScoreDirector<CheapTimeSolution> destinationScoreDirector) {
+        return new CheapTimePillarSlideMove(rebaseList(pillar, destinationScoreDirector), startPeriodDiff);
     }
 
     @Override

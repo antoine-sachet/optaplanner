@@ -22,11 +22,10 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
 
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamImplicit;
@@ -34,44 +33,34 @@ import org.optaplanner.benchmark.api.PlannerBenchmark;
 import org.optaplanner.benchmark.config.blueprint.SolverBenchmarkBluePrintConfig;
 import org.optaplanner.benchmark.config.report.BenchmarkReportConfig;
 import org.optaplanner.benchmark.impl.DefaultPlannerBenchmark;
+import org.optaplanner.benchmark.impl.report.BenchmarkReport;
 import org.optaplanner.benchmark.impl.result.PlannerBenchmarkResult;
 import org.optaplanner.core.config.SolverConfigContext;
 import org.optaplanner.core.config.util.ConfigUtils;
+import org.optaplanner.core.impl.solver.thread.DefaultSolverThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.commons.lang3.ObjectUtils.*;
 
 @XStreamAlias("plannerBenchmark")
 public class PlannerBenchmarkConfig {
 
     public static final String PARALLEL_BENCHMARK_COUNT_AUTO = "AUTO";
-    /**
-     * @see Runtime#availableProcessors()
-     */
-    public static final String AVAILABLE_PROCESSOR_COUNT = "availableProcessorCount";
-    public static final Pattern VALID_NAME_PATTERN;
-    // TODO Remove workaround for Java 6 (once we no longer support it) and unignore tests related to PLANNER-348.
-    static {
-        Pattern validNamePattern;
-        try {
-            validNamePattern = Pattern.compile("(?U)^[\\w\\d _\\-\\.\\(\\)]+$");
-        } catch (PatternSyntaxException e) {
-            // Java 6 does not support (?U)
-            validNamePattern = Pattern.compile("^[\\w\\d _\\-\\.\\(\\)]+$");
-        }
-        VALID_NAME_PATTERN = validNamePattern;
-    }
-
+    public static final Pattern VALID_NAME_PATTERN = Pattern.compile("(?U)^[\\w\\d _\\-\\.\\(\\)]+$");
 
     private static final Logger logger = LoggerFactory.getLogger(PlannerBenchmarkConfig.class);
 
     private String name = null;
     private File benchmarkDirectory = null;
 
+    private Class<? extends ThreadFactory> threadFactoryClass = null;
     private String parallelBenchmarkCount = null;
     private Long warmUpMillisecondsSpentLimit = null;
     private Long warmUpSecondsSpentLimit = null;
     private Long warmUpMinutesSpentLimit = null;
     private Long warmUpHoursSpentLimit = null;
+    private Long warmUpDaysSpentLimit = null;
 
     @XStreamAlias("benchmarkReport")
     private BenchmarkReportConfig benchmarkReportConfig = null;
@@ -83,6 +72,10 @@ public class PlannerBenchmarkConfig {
     private List<SolverBenchmarkBluePrintConfig> solverBenchmarkBluePrintConfigList = null;
     @XStreamImplicit(itemFieldName = "solverBenchmark")
     private List<SolverBenchmarkConfig> solverBenchmarkConfigList = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public String getName() {
         return name;
@@ -100,12 +93,20 @@ public class PlannerBenchmarkConfig {
         this.benchmarkDirectory = benchmarkDirectory;
     }
 
+    public Class<? extends ThreadFactory> getThreadFactoryClass() {
+        return threadFactoryClass;
+    }
+
+    public void setThreadFactoryClass(Class<? extends ThreadFactory> threadFactoryClass) {
+        this.threadFactoryClass = threadFactoryClass;
+    }
+
     /**
      * Using multiple parallel benchmarks can decrease the reliability of the results.
      * <p>
      * If there aren't enough processors available, it will be decreased.
-     * @return null, {@value #PARALLEL_BENCHMARK_COUNT_AUTO}
-     * or a JavaScript calculation using {@value #AVAILABLE_PROCESSOR_COUNT}.
+     * @return null, a number, {@value #PARALLEL_BENCHMARK_COUNT_AUTO} or a JavaScript calculation using
+     * {@value org.optaplanner.core.config.util.ConfigUtils#AVAILABLE_PROCESSOR_COUNT}.
      */
     public String getParallelBenchmarkCount() {
         return parallelBenchmarkCount;
@@ -145,6 +146,14 @@ public class PlannerBenchmarkConfig {
 
     public void setWarmUpHoursSpentLimit(Long warmUpHoursSpentLimit) {
         this.warmUpHoursSpentLimit = warmUpHoursSpentLimit;
+    }
+
+    public Long getWarmUpDaysSpentLimit() {
+        return warmUpDaysSpentLimit;
+    }
+
+    public void setWarmUpDaysSpentLimit(Long warmUpDaysSpentLimit) {
+        this.warmUpDaysSpentLimit = warmUpDaysSpentLimit;
     }
 
     public BenchmarkReportConfig getBenchmarkReportConfig() {
@@ -188,6 +197,11 @@ public class PlannerBenchmarkConfig {
     }
 
     public PlannerBenchmark buildPlannerBenchmark(SolverConfigContext solverConfigContext) {
+        return buildPlannerBenchmark(solverConfigContext, new Object[0]);
+    }
+
+    public <Solution_> PlannerBenchmark buildPlannerBenchmark(SolverConfigContext solverConfigContext,
+            Solution_[] extraProblems) {
         validate();
         generateSolverBenchmarkConfigNames();
         List<SolverBenchmarkConfig> effectiveSolverBenchmarkConfigList = buildEffectiveSolverBenchmarkConfigList();
@@ -195,21 +209,33 @@ public class PlannerBenchmarkConfig {
         PlannerBenchmarkResult plannerBenchmarkResult = new PlannerBenchmarkResult();
         plannerBenchmarkResult.setName(name);
         plannerBenchmarkResult.setAggregation(false);
-        DefaultPlannerBenchmark plannerBenchmark = new DefaultPlannerBenchmark(plannerBenchmarkResult, solverConfigContext);
-        plannerBenchmark.setBenchmarkDirectory(benchmarkDirectory);
-        plannerBenchmarkResult.setParallelBenchmarkCount(resolveParallelBenchmarkCount());
-        plannerBenchmarkResult.setWarmUpTimeMillisSpentLimit(calculateWarmUpTimeMillisSpentLimit());
-        BenchmarkReportConfig benchmarkReportConfig_ = benchmarkReportConfig == null ? new BenchmarkReportConfig()
-                : benchmarkReportConfig;
-        plannerBenchmark.setBenchmarkReport(benchmarkReportConfig_.buildBenchmarkReport(plannerBenchmarkResult));
-
+        int parallelBenchmarkCount = resolveParallelBenchmarkCount();
+        plannerBenchmarkResult.setParallelBenchmarkCount(parallelBenchmarkCount);
+        plannerBenchmarkResult.setWarmUpTimeMillisSpentLimit(defaultIfNull(calculateWarmUpTimeMillisSpentLimit(), 30L));
         plannerBenchmarkResult.setUnifiedProblemBenchmarkResultList(new ArrayList<>());
         plannerBenchmarkResult.setSolverBenchmarkResultList(new ArrayList<>(
                 effectiveSolverBenchmarkConfigList.size()));
         for (SolverBenchmarkConfig solverBenchmarkConfig : effectiveSolverBenchmarkConfigList) {
-            solverBenchmarkConfig.buildSolverBenchmark(plannerBenchmarkResult);
+            solverBenchmarkConfig.buildSolverBenchmark(solverConfigContext, plannerBenchmarkResult, extraProblems);
         }
-        return plannerBenchmark;
+
+        BenchmarkReportConfig benchmarkReportConfig_ = benchmarkReportConfig == null ? new BenchmarkReportConfig()
+                : benchmarkReportConfig;
+        BenchmarkReport benchmarkReport = benchmarkReportConfig_.buildBenchmarkReport(plannerBenchmarkResult);
+        return new DefaultPlannerBenchmark(
+                plannerBenchmarkResult, solverConfigContext, benchmarkDirectory,
+                buildExecutorService(parallelBenchmarkCount), buildExecutorService(parallelBenchmarkCount),
+                benchmarkReport);
+    }
+
+    private ExecutorService buildExecutorService(int parallelBenchmarkCount) {
+        ThreadFactory threadFactory;
+        if (threadFactoryClass != null) {
+            threadFactory = ConfigUtils.newInstance(this, "threadFactoryClass", threadFactoryClass);
+        } else {
+            threadFactory = new DefaultSolverThreadFactory("BenchmarkThread");
+        }
+        return Executors.newFixedThreadPool(parallelBenchmarkCount, threadFactory);
     }
 
     protected void validate() {
@@ -287,32 +313,10 @@ public class PlannerBenchmarkConfig {
         if (parallelBenchmarkCount == null) {
             resolvedParallelBenchmarkCount = 1;
         } else if (parallelBenchmarkCount.equals(PARALLEL_BENCHMARK_COUNT_AUTO)) {
-            // TODO Tweak it based on experience
-            if (availableProcessorCount <= 2) {
-                resolvedParallelBenchmarkCount = 1;
-            } else if (availableProcessorCount <= 4) {
-                resolvedParallelBenchmarkCount = 2;
-            } else {
-                resolvedParallelBenchmarkCount = (availableProcessorCount / 2) + 1;
-            }
+            resolvedParallelBenchmarkCount = resolveParallelBenchmarkCountAutomatically(availableProcessorCount);
         } else {
-            String scriptLanguage = "JavaScript";
-            ScriptEngine scriptEngine = new ScriptEngineManager().getEngineByName(scriptLanguage);
-            scriptEngine.put(AVAILABLE_PROCESSOR_COUNT, availableProcessorCount);
-            Object scriptResult;
-            try {
-                scriptResult = scriptEngine.eval(parallelBenchmarkCount);
-            } catch (ScriptException e) {
-                throw new IllegalArgumentException("The parallelBenchmarkCount (" + parallelBenchmarkCount
-                        + ") is not " + PARALLEL_BENCHMARK_COUNT_AUTO + " and cannot be parsed in " + scriptLanguage
-                        + " with the variables ([" + AVAILABLE_PROCESSOR_COUNT + "]).", e);
-            }
-            if (!(scriptResult instanceof Number)) {
-                throw new IllegalArgumentException("The parallelBenchmarkCount (" + parallelBenchmarkCount
-                        + ") is resolved to scriptResult (" + scriptResult + ") in " + scriptLanguage
-                        + " and is not a Number.");
-            }
-            resolvedParallelBenchmarkCount = ((Number) scriptResult).intValue();
+            resolvedParallelBenchmarkCount = ConfigUtils.resolveThreadPoolSizeScript(
+                    "parallelBenchmarkCount", parallelBenchmarkCount, PARALLEL_BENCHMARK_COUNT_AUTO);
         }
         if (resolvedParallelBenchmarkCount < 1) {
             throw new IllegalArgumentException("The parallelBenchmarkCount (" + parallelBenchmarkCount
@@ -320,27 +324,65 @@ public class PlannerBenchmarkConfig {
                     + ") that is lower than 1.");
         }
         if (resolvedParallelBenchmarkCount > availableProcessorCount) {
-            logger.warn("Because the resolvedParallelBenchmarkCount (" + resolvedParallelBenchmarkCount
-                    + ") is higher than the availableProcessorCount (" + availableProcessorCount
-                    + "), it is reduced to availableProcessorCount.");
+            logger.warn("Because the resolvedParallelBenchmarkCount ({}) is higher "
+                    + "than the availableProcessorCount ({}), it is reduced to "
+                    + "availableProcessorCount.", resolvedParallelBenchmarkCount, availableProcessorCount);
             resolvedParallelBenchmarkCount = availableProcessorCount;
         }
         return resolvedParallelBenchmarkCount;
     }
 
-    protected long calculateWarmUpTimeMillisSpentLimit() {
+    protected int resolveParallelBenchmarkCountAutomatically(int availableProcessorCount) {
+        // Tweaked based on experience
+        if (availableProcessorCount <= 2) {
+            return 1;
+        } else if (availableProcessorCount <= 4) {
+            return 2;
+        } else {
+            return (availableProcessorCount / 2) + 1;
+        }
+    }
+
+    protected Long calculateWarmUpTimeMillisSpentLimit() {
+        if (warmUpMillisecondsSpentLimit == null && warmUpSecondsSpentLimit == null
+                && warmUpMinutesSpentLimit == null && warmUpHoursSpentLimit == null && warmUpDaysSpentLimit == null) {
+            return null;
+        }
         long warmUpTimeMillisSpentLimit = 0L;
         if (warmUpMillisecondsSpentLimit != null) {
+            if (warmUpMillisecondsSpentLimit < 0L) {
+                throw new IllegalArgumentException("The warmUpMillisecondsSpentLimit (" + warmUpMillisecondsSpentLimit
+                        + ") cannot be negative.");
+            }
             warmUpTimeMillisSpentLimit += warmUpMillisecondsSpentLimit;
         }
         if (warmUpSecondsSpentLimit != null) {
-            warmUpTimeMillisSpentLimit += warmUpSecondsSpentLimit * 1000L;
+            if (warmUpSecondsSpentLimit < 0L) {
+                throw new IllegalArgumentException("The warmUpSecondsSpentLimit (" + warmUpSecondsSpentLimit
+                        + ") cannot be negative.");
+            }
+            warmUpTimeMillisSpentLimit += warmUpSecondsSpentLimit * 1_000L;
         }
         if (warmUpMinutesSpentLimit != null) {
-            warmUpTimeMillisSpentLimit += warmUpMinutesSpentLimit * 60000L;
+            if (warmUpMinutesSpentLimit < 0L) {
+                throw new IllegalArgumentException("The warmUpMinutesSpentLimit (" + warmUpMinutesSpentLimit
+                        + ") cannot be negative.");
+            }
+            warmUpTimeMillisSpentLimit += warmUpMinutesSpentLimit * 60_000L;
         }
         if (warmUpHoursSpentLimit != null) {
-            warmUpTimeMillisSpentLimit += warmUpHoursSpentLimit * 3600000L;
+            if (warmUpHoursSpentLimit < 0L) {
+                throw new IllegalArgumentException("The warmUpHoursSpentLimit (" + warmUpHoursSpentLimit
+                        + ") cannot be negative.");
+            }
+            warmUpTimeMillisSpentLimit += warmUpHoursSpentLimit * 3_600_000L;
+        }
+        if (warmUpDaysSpentLimit != null) {
+            if (warmUpDaysSpentLimit < 0L) {
+                throw new IllegalArgumentException("The warmUpDaysSpentLimit (" + warmUpDaysSpentLimit
+                        + ") cannot be negative.");
+            }
+            warmUpTimeMillisSpentLimit += warmUpDaysSpentLimit * 86_400_000L;
         }
         return warmUpTimeMillisSpentLimit;
     }

@@ -17,7 +17,6 @@
 package org.optaplanner.core.impl.heuristic.selector.value.decorator;
 
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
-import org.optaplanner.core.api.domain.variable.PlanningVariable;
 import org.optaplanner.core.impl.domain.entity.descriptor.EntityDescriptor;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
 import org.optaplanner.core.impl.domain.variable.inverserelation.SingletonInverseVariableDemand;
@@ -41,7 +40,7 @@ public class MovableChainedTrailingValueFilter<Solution_> implements SelectionFi
     @Override
     public boolean accept(ScoreDirector<Solution_> scoreDirector, Object value) {
         if (value == null) {
-             return true;
+            return true;
         }
         SingletonInverseVariableSupply supply = retrieveSingletonInverseVariableSupply(scoreDirector);
         Object trailingEntity = supply.getInverseSingleton(value);
@@ -49,7 +48,7 @@ public class MovableChainedTrailingValueFilter<Solution_> implements SelectionFi
         if (trailingEntity == null || !entityDescriptor.matchesEntity(trailingEntity)) {
             return true;
         }
-        return entityDescriptor.getMovableEntitySelectionFilter().accept(scoreDirector, trailingEntity);
+        return entityDescriptor.getEffectiveMovableEntitySelectionFilter().accept(scoreDirector, trailingEntity);
     }
 
     protected SingletonInverseVariableSupply retrieveSingletonInverseVariableSupply(ScoreDirector<Solution_> scoreDirector) {

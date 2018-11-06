@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.kie</groupId>
     <artifactId>kie-parent</artifactId>
-    <version>7.0.0-SNAPSHOT</version>
+    <version>7.14.0-SNAPSHOT</version>
     <!-- relativePath causes out-of-date problems on hudson slaves -->
     <!--<relativePath>../droolsjbpm-build-bootstrap/pom.xml</relativePath>-->
   </parent>
@@ -23,8 +23,12 @@
 
     This module is just the multiproject parent. The planning engine itself is in optaplanner-core.
   </description>
-  <url>http://www.optaplanner.org</url>
+  <url>https://www.optaplanner.org</url>
   <inceptionYear>2006</inceptionYear>
+
+  <properties>
+    <findbugs.failOnViolation>true</findbugs.failOnViolation>
+  </properties>
 
   <repositories>
     <!-- Bootstrap repository to locate the parent pom when the parent pom has not been build locally. -->
@@ -45,9 +49,9 @@
   </repositories>
 
   <scm>
-    <connection>scm:git:git@github.com:droolsjbpm/optaplanner.git</connection>
-    <developerConnection>scm:git:git@github.com:droolsjbpm/optaplanner.git</developerConnection>
-    <url>https://github.com/droolsjbpm/optaplanner</url>
+    <connection>scm:git:git@github.com:kiegroup/optaplanner.git</connection>
+    <developerConnection>scm:git:git@github.com:kiegroup/optaplanner.git</developerConnection>
+    <url>https://github.com/kiegroup/optaplanner</url>
   </scm>
   <issueManagement>
     <system>jira</system>
@@ -57,7 +61,9 @@
   <modules>
     <module>optaplanner-core</module>
     <module>optaplanner-persistence</module>
+    <module>optaplanner-integration</module>
     <module>optaplanner-benchmark</module>
+    <module>optaplanner-test</module>
     <module>optaplanner-examples</module>
     <module>optaplanner-webexamples</module>
   </modules>
@@ -77,6 +83,12 @@
         <version>${version.org.kie}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish</groupId>
+        <artifactId>javax.json</artifactId>
+        <!-- Old version until this issue is resolved: https://github.com/ImmobilienScout24/illegal-transitive-dependency-check/issues/30 -->
+        <version>1.0.4</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -100,17 +112,16 @@
     <pluginManagement>
       <plugins>
         <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>findbugs-maven-plugin</artifactId>
+          <configuration>
+            <maxRank>14</maxRank>
+            <includeTests>true</includeTests>
+          </configuration>
+        </plugin>
+        <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
-          <!-- TODO: Upgrade to newest version of checkstyle once we move to Java 7+ -->
-          <!-- https://maven.apache.org/components/plugins/maven-checkstyle-plugin/examples/upgrading-checkstyle.html -->
-          <!--<dependencies>-->
-            <!--<dependency>-->
-              <!--<groupId>com.puppycrawl.tools</groupId>-->
-              <!--<artifactId>checkstyle</artifactId>-->
-              <!--<version>6.9</version>-->
-            <!--</dependency>-->
-          <!--</dependencies>-->
           <executions>
             <execution>
               <id>validate</id>
@@ -119,7 +130,7 @@
                 <goal>check</goal>
               </goals>
               <configuration>
-                <checkstyleRules>
+                <checkstyleRules combine.self="override">
                   <module name="Checker">
                     <property name="severity" value="warning" default="warning"/>
                     <!-- Checks whether files end with a new line. -->
@@ -131,15 +142,17 @@
                       <property name="severity" value="error"/>
                       <property name="eachLine" value="true"/>
                     </module>
+                    <module name="SuppressWarningsFilter"/>
                     <module name="TreeWalker">
                       <property name="cacheFile" value="target/cachefile"/>
                       <property name="tabWidth" value="4"/>
                       <!-- Checks for Javadoc comments. -->
                       <module name="JavadocStyle"/>
                       <!-- TODO: Enable NonEmptyAtclauseDescription after https://github.com/checkstyle/checkstyle/issues/1064 is fixed -->
+                      <!-- Update: #1064 is resolved and the performance has greatly improved but this check still adds ~2 seconds -->
+                      <!-- to the build time -> always measure build time before enabling this module (use github.com/jcgay/maven-profiler) -->
                       <!--<module name="NonEmptyAtclauseDescription"/>-->
                       <!-- Checks for imports. -->
-                      <!--<module name="UnusedImports"/>-->
                       <module name="RedundantImport"/>
                       <!-- defaults to sun.* packages -->
                       <module name="IllegalImport"/>
@@ -155,12 +168,10 @@
                       <module name="ParenPad"/>
                       <module name="TypecastParenPad"/>
                       <module name="WhitespaceAfter"/>
-                      <!-- TODO: Enable the WhitespaceAround once checkstyle supports allowEmptyBlocks -->
-                      <!--<module name="WhitespaceAround">-->
-                        <!--<property name="allowEmptyConstructors" value="true"/>-->
-                        <!--<property name="allowEmptyTypes" value="true"/>-->
-                        <!--<property name="allowEmptyBlocks" value="true"/>-->
-                      <!--</module>-->
+                      <module name="WhitespaceAround">
+                        <property name="allowEmptyConstructors" value="true"/>
+                        <property name="allowEmptyTypes" value="true"/>
+                      </module>
                       <!-- Checks for blocks. -->
                       <module name="LeftCurly"/>
                       <module name="NeedBraces"/>
@@ -177,6 +188,7 @@
                       <!-- Miscellaneous other checks. -->
                       <module name="ArrayTypeStyle"/>
                       <module name="UpperEll"/>
+                      <module name="SuppressWarningsHolder"/>
                     </module>
                   </module>
                 </checkstyleRules>

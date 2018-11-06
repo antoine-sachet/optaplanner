@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/vehiclerouting/template</benchmarkDirectory>
   <parallelBenchmarkCount>AUTO</parallelBenchmarkCount>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -98,7 +97,6 @@
       <inputSolutionFile>data/vehiclerouting/import/vrpweb/timewindowed/air/Homberger_1000_R210_1.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/vrpweb/timewindowed/air/Homberger_1000_RC110_1.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/vrpweb/timewindowed/air/Homberger_1000_RC210_1.vrp</inputSolutionFile>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
     </problemBenchmarks>
 
     <solver>
@@ -109,7 +107,6 @@
       <entityClass>org.optaplanner.examples.vehiclerouting.domain.timewindowed.TimeWindowedCustomer</entityClass>
 
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT_LONG</scoreDefinitionType>
         <incrementalScoreCalculatorClass>org.optaplanner.examples.vehiclerouting.solver.score.VehicleRoutingIncrementalScoreCalculator</incrementalScoreCalculatorClass>
         <!--<scoreDrl>org/optaplanner/examples/vehiclerouting/solver/vehicleRoutingScoreRules.drl</scoreDrl>-->
       </scoreDirectorFactory>

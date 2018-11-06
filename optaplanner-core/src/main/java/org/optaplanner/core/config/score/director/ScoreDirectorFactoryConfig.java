@@ -25,6 +25,7 @@ import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamConverter;
 import com.thoughtworks.xstream.annotations.XStreamImplicit;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
+import org.apache.commons.lang3.BooleanUtils;
 import org.kie.api.KieBase;
 import org.kie.api.KieBaseConfiguration;
 import org.kie.api.KieServices;
@@ -32,9 +33,12 @@ import org.kie.api.builder.KieBuilder;
 import org.kie.api.builder.KieFileSystem;
 import org.kie.api.builder.Message;
 import org.kie.api.builder.Results;
+import org.kie.api.builder.model.KieModuleModel;
 import org.kie.api.io.KieResources;
 import org.kie.api.runtime.KieContainer;
-import org.optaplanner.core.api.score.Score;
+import org.kie.internal.builder.conf.PropertySpecificOption;
+import org.optaplanner.core.api.domain.solution.PlanningScore;
+import org.optaplanner.core.api.solver.SolverFactory;
 import org.optaplanner.core.config.AbstractConfig;
 import org.optaplanner.core.config.SolverConfigContext;
 import org.optaplanner.core.config.score.definition.ScoreDefinitionType;
@@ -61,6 +65,8 @@ import org.optaplanner.core.impl.score.director.AbstractScoreDirectorFactory;
 import org.optaplanner.core.impl.score.director.InnerScoreDirectorFactory;
 import org.optaplanner.core.impl.score.director.drools.DroolsScoreDirectorFactory;
 import org.optaplanner.core.impl.score.director.drools.LegacyDroolsScoreDirectorFactory;
+import org.optaplanner.core.impl.score.director.drools.testgen.TestGenDroolsScoreDirectorFactory;
+import org.optaplanner.core.impl.score.director.drools.testgen.TestGenLegacyDroolsScoreDirectorFactory;
 import org.optaplanner.core.impl.score.director.easy.EasyScoreCalculator;
 import org.optaplanner.core.impl.score.director.easy.EasyScoreDirectorFactory;
 import org.optaplanner.core.impl.score.director.incremental.IncrementalScoreCalculator;
@@ -74,60 +80,97 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
 
     private static final Logger logger = LoggerFactory.getLogger(ScoreDirectorFactoryConfig.class);
 
-    protected Class<? extends ScoreDefinition> scoreDefinitionClass = null;
-    protected ScoreDefinitionType scoreDefinitionType = null;
-    protected Integer bendableHardLevelsSize = null;
-    protected Integer bendableSoftLevelsSize = null;
+    @Deprecated protected Class<? extends ScoreDefinition> scoreDefinitionClass = null;
+    @Deprecated protected ScoreDefinitionType scoreDefinitionType = null;
+    @Deprecated protected Integer bendableHardLevelsSize = null;
+    @Deprecated protected Integer bendableSoftLevelsSize = null;
 
     protected Class<? extends EasyScoreCalculator> easyScoreCalculatorClass = null;
+    @XStreamConverter(KeyAsElementMapConverter.class)
+    protected Map<String, String> easyScoreCalculatorCustomProperties = null;
 
     protected Class<? extends IncrementalScoreCalculator> incrementalScoreCalculatorClass = null;
+    @XStreamConverter(KeyAsElementMapConverter.class)
+    protected Map<String, String> incrementalScoreCalculatorCustomProperties = null;
 
     protected String ksessionName = null;
     @XStreamOmitField
-    @Deprecated
+    @Deprecated // TODO remove in 8.0
     protected KieBase kieBase = null;
     @XStreamImplicit(itemFieldName = "scoreDrl")
     protected List<String> scoreDrlList = null;
     @XStreamImplicit(itemFieldName = "scoreDrlFile")
     protected List<File> scoreDrlFileList = null;
-    @XStreamConverter(value = KeyAsElementMapConverter.class)
+    @XStreamConverter(KeyAsElementMapConverter.class)
     protected Map<String, String> kieBaseConfigurationProperties = null;
+    protected Boolean generateDroolsTestOnError = null;
 
     protected String initializingScoreTrend = null;
 
     @XStreamAlias("assertionScoreDirectorFactory")
     protected ScoreDirectorFactoryConfig assertionScoreDirectorFactory = null;
 
-    public Class<? extends ScoreDefinition> getScoreDefinitionClass() {
+    /**
+     * @return sometimes null
+     * @deprecated Use {@link PlanningScore#scoreDefinitionClass()} instead. Will be removed in 8.0.
+     */
+    @Deprecated public Class<? extends ScoreDefinition> getScoreDefinitionClass() {
         return scoreDefinitionClass;
     }
 
-    public void setScoreDefinitionClass(Class<? extends ScoreDefinition> scoreDefinitionClass) {
+    /**
+     * @param scoreDefinitionClass sometimes null
+     * @deprecated Use {@link PlanningScore#scoreDefinitionClass()} instead. Will be removed in 8.0.
+     */
+    @Deprecated public void setScoreDefinitionClass(Class<? extends ScoreDefinition> scoreDefinitionClass) {
         this.scoreDefinitionClass = scoreDefinitionClass;
     }
 
-    public ScoreDefinitionType getScoreDefinitionType() {
+    /**
+     * @return sometimes null
+     * @deprecated Use {@link PlanningScore} instead. Will be removed in 8.0.
+     */
+    @Deprecated public ScoreDefinitionType getScoreDefinitionType() {
         return scoreDefinitionType;
     }
 
-    public void setScoreDefinitionType(ScoreDefinitionType scoreDefinitionType) {
+    /**
+     * @param scoreDefinitionType sometimes null
+     * @deprecated Use {@link PlanningScore} instead. Will be removed in 8.0.
+     */
+    @Deprecated public void setScoreDefinitionType(ScoreDefinitionType scoreDefinitionType) {
         this.scoreDefinitionType = scoreDefinitionType;
     }
 
-    public Integer getBendableHardLevelsSize() {
+    /**
+     * @return sometimes null
+     * @deprecated Use {@link PlanningScore#bendableHardLevelsSize()} instead. Will be removed in 8.0.
+     */
+    @Deprecated public Integer getBendableHardLevelsSize() {
         return bendableHardLevelsSize;
     }
 
-    public void setBendableHardLevelsSize(Integer bendableHardLevelsSize) {
+    /**
+     * @param bendableHardLevelsSize sometimes null
+     * @deprecated Use {@link PlanningScore#bendableHardLevelsSize()} instead. Will be removed in 8.0.
+     */
+    @Deprecated public void setBendableHardLevelsSize(Integer bendableHardLevelsSize) {
         this.bendableHardLevelsSize = bendableHardLevelsSize;
     }
 
-    public Integer getBendableSoftLevelsSize() {
+    /**
+     * @return sometimes null
+     * @deprecated Use {@link PlanningScore#bendableSoftLevelsSize()} instead. Will be removed in 8.0.
+     */
+    @Deprecated public Integer getBendableSoftLevelsSize() {
         return bendableSoftLevelsSize;
     }
 
-    public void setBendableSoftLevelsSize(Integer bendableSoftLevelsSize) {
+    /**
+     * @param bendableSoftLevelsSize sometimes null
+     * @deprecated Use {@link PlanningScore#bendableSoftLevelsSize()} instead. Will be removed in 8.0.
+     */
+    @Deprecated public void setBendableSoftLevelsSize(Integer bendableSoftLevelsSize) {
         this.bendableSoftLevelsSize = bendableSoftLevelsSize;
     }
 
@@ -139,12 +182,28 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
         this.easyScoreCalculatorClass = easyScoreCalculatorClass;
     }
 
+    public Map<String, String> getEasyScoreCalculatorCustomProperties() {
+        return easyScoreCalculatorCustomProperties;
+    }
+
+    public void setEasyScoreCalculatorCustomProperties(Map<String, String> easyScoreCalculatorCustomProperties) {
+        this.easyScoreCalculatorCustomProperties = easyScoreCalculatorCustomProperties;
+    }
+
     public Class<? extends IncrementalScoreCalculator> getIncrementalScoreCalculatorClass() {
         return incrementalScoreCalculatorClass;
     }
 
     public void setIncrementalScoreCalculatorClass(Class<? extends IncrementalScoreCalculator> incrementalScoreCalculatorClass) {
         this.incrementalScoreCalculatorClass = incrementalScoreCalculatorClass;
+    }
+
+    public Map<String, String> getIncrementalScoreCalculatorCustomProperties() {
+        return incrementalScoreCalculatorCustomProperties;
+    }
+
+    public void setIncrementalScoreCalculatorCustomProperties(Map<String, String> incrementalScoreCalculatorCustomProperties) {
+        this.incrementalScoreCalculatorCustomProperties = incrementalScoreCalculatorCustomProperties;
     }
 
     public String getKsessionName() {
@@ -157,19 +216,17 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
 
     /**
      * @return sometimes null
-     * @deprecated Use {@link #getKsessionName()} instead.
+     * @deprecated Use {@link #setKsessionName(String)} and {@link SolverFactory#createFromKieContainerXmlResource(KieContainer, String)} instead. Might be removed in 8.0.
      */
-    @Deprecated
-    public KieBase getKieBase() {
+    @Deprecated public KieBase getKieBase() {
         return kieBase;
     }
 
     /**
      * @param kieBase sometimes null
-     * @deprecated Use {@link #setKsessionName(String)} instead.
+     * @deprecated Use {@link #setKsessionName(String)} and {@link SolverFactory#createFromKieContainerXmlResource(KieContainer, String)} instead. Might be removed in 8.0.
      */
-    @Deprecated
-    public void setKieBase(KieBase kieBase) {
+    @Deprecated public void setKieBase(KieBase kieBase) {
         this.kieBase = kieBase;
     }
 
@@ -213,25 +270,19 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
         this.assertionScoreDirectorFactory = assertionScoreDirectorFactory;
     }
 
+    public Boolean isGenerateDroolsTestOnError() {
+        return generateDroolsTestOnError;
+    }
+
+    public void setGenerateDroolsTestOnError(Boolean generateDroolsTestOnError) {
+        this.generateDroolsTestOnError = generateDroolsTestOnError;
+    }
+
     // ************************************************************************
     // Builder methods
     // ************************************************************************
 
-    public <Solution_> InnerScoreDirectorFactory<Solution_> buildScoreDirectorFactory(
-            SolverConfigContext configContext, EnvironmentMode environmentMode,
-            SolutionDescriptor<Solution_> solutionDescriptor) {
-        ScoreDefinition scoreDefinition = buildScoreDefinition();
-        Class<? extends Score> scoreClass = solutionDescriptor.extractScoreClass();
-        if (!scoreClass.isAssignableFrom(scoreDefinition.getScoreClass())) {
-            throw new IllegalArgumentException("The scoreClass (" + scoreClass
-                    + ") of solutionClass (" + solutionDescriptor.getSolutionClass()
-                    + ") is not the same or a superclass as the scoreDefinition's scoreClass ("
-                    + scoreDefinition.getScoreClass() + ").");
-        }
-        return buildScoreDirectorFactory(configContext, environmentMode, solutionDescriptor, scoreDefinition);
-    }
-
-    public ScoreDefinition buildScoreDefinition() {
+    public ScoreDefinition buildDeprecatedScoreDefinition() {
         if (scoreDefinitionType != ScoreDefinitionType.BENDABLE
                 && scoreDefinitionType != ScoreDefinitionType.BENDABLE_LONG
                 && scoreDefinitionType != ScoreDefinitionType.BENDABLE_BIG_DECIMAL
@@ -288,16 +339,16 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                             + ") is not implemented.");
             }
         } else {
-            return new SimpleScoreDefinition();
+            return null;
         }
     }
 
-    protected <Solution_> InnerScoreDirectorFactory<Solution_> buildScoreDirectorFactory(
+    public <Solution_> InnerScoreDirectorFactory<Solution_> buildScoreDirectorFactory(
             SolverConfigContext configContext, EnvironmentMode environmentMode,
-            SolutionDescriptor<Solution_> solutionDescriptor, ScoreDefinition scoreDefinition) {
-        AbstractScoreDirectorFactory<Solution_> easyScoreDirectorFactory = buildEasyScoreDirectorFactory();
-        AbstractScoreDirectorFactory<Solution_> incrementalScoreDirectorFactory = buildIncrementalScoreDirectorFactory();
-        AbstractScoreDirectorFactory<Solution_> droolsScoreDirectorFactory = buildDroolsScoreDirectorFactory(configContext);
+            SolutionDescriptor<Solution_> solutionDescriptor) {
+        AbstractScoreDirectorFactory<Solution_> easyScoreDirectorFactory = buildEasyScoreDirectorFactory(solutionDescriptor);
+        AbstractScoreDirectorFactory<Solution_> incrementalScoreDirectorFactory = buildIncrementalScoreDirectorFactory(solutionDescriptor);
+        AbstractScoreDirectorFactory<Solution_> droolsScoreDirectorFactory = buildDroolsScoreDirectorFactory(configContext, solutionDescriptor);
         AbstractScoreDirectorFactory<Solution_> scoreDirectorFactory;
         if (easyScoreDirectorFactory != null) {
             if (incrementalScoreDirectorFactory != null) {
@@ -308,11 +359,19 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                 throw new IllegalArgumentException("The scoreDirectorFactory cannot have "
                         + "both an easyScoreDirectorFactory and an droolsScoreDirectorFactory.");
             }
+            if (BooleanUtils.isTrue(generateDroolsTestOnError)) {
+                throw new IllegalArgumentException("The <generateDroolsTestOnError> option can only be set to true "
+                        + "when used together with droolsScoreDirectorFactory, not with easyScoreDirectorFactory.");
+            }
             scoreDirectorFactory = easyScoreDirectorFactory;
         } else if (incrementalScoreDirectorFactory != null) {
             if (droolsScoreDirectorFactory != null) {
                 throw new IllegalArgumentException("The scoreDirectorFactory cannot have "
                         + "both an incrementalScoreDirectorFactory and an droolsScoreDirectorFactory.");
+            }
+            if (BooleanUtils.isTrue(generateDroolsTestOnError)) {
+                throw new IllegalArgumentException("The <generateDroolsTestOnError> option can only be set to true "
+                        + "when used together with droolsScoreDirectorFactory, not with incrementalScoreDirectorFactory.");
             }
             scoreDirectorFactory = incrementalScoreDirectorFactory;
         } else if (droolsScoreDirectorFactory != null) {
@@ -321,8 +380,6 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
             throw new IllegalArgumentException("The scoreDirectorFactory lacks a configuration for an "
                     + "easyScoreDirectorFactory, an incrementalScoreDirectorFactory or a droolsScoreDirectorFactory.");
         }
-        scoreDirectorFactory.setSolutionDescriptor(solutionDescriptor);
-        scoreDirectorFactory.setScoreDefinition(scoreDefinition);
         if (assertionScoreDirectorFactory != null) {
             if (assertionScoreDirectorFactory.getAssertionScoreDirectorFactory() != null) {
                 throw new IllegalArgumentException("A assertionScoreDirectorFactory ("
@@ -342,42 +399,62 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
             }
             scoreDirectorFactory.setAssertionScoreDirectorFactory(
                     assertionScoreDirectorFactory.buildScoreDirectorFactory(configContext,
-                            EnvironmentMode.NON_REPRODUCIBLE, solutionDescriptor, scoreDefinition));
+                            EnvironmentMode.NON_REPRODUCIBLE, solutionDescriptor));
         }
         scoreDirectorFactory.setInitializingScoreTrend(InitializingScoreTrend.parseTrend(
                 initializingScoreTrend == null ? InitializingScoreTrendLevel.ANY.name() : initializingScoreTrend,
-                scoreDefinition.getLevelsSize()));
+                solutionDescriptor.getScoreDefinition().getLevelsSize()));
         if (environmentMode.isNonIntrusiveFullAsserted()) {
             scoreDirectorFactory.setAssertClonedSolution(true);
         }
         return scoreDirectorFactory;
     }
 
-    protected <Solution_> AbstractScoreDirectorFactory<Solution_> buildEasyScoreDirectorFactory() {
+    protected <Solution_> AbstractScoreDirectorFactory<Solution_> buildEasyScoreDirectorFactory(
+            SolutionDescriptor<Solution_> solutionDescriptor) {
         if (easyScoreCalculatorClass != null) {
+            if (!EasyScoreCalculator.class.isAssignableFrom(easyScoreCalculatorClass)) {
+                throw new IllegalArgumentException(
+                        "The easyScoreCalculatorClass (" + easyScoreCalculatorClass
+                                + ") does not implement " + EasyScoreCalculator.class.getSimpleName() + ".");
+            }
             EasyScoreCalculator<Solution_> easyScoreCalculator = ConfigUtils.newInstance(this,
                     "easyScoreCalculatorClass", easyScoreCalculatorClass);
-            return new EasyScoreDirectorFactory<>(easyScoreCalculator);
+            ConfigUtils.applyCustomProperties(easyScoreCalculator, "easyScoreCalculatorClass",
+                    easyScoreCalculatorCustomProperties, "easyScoreCalculatorCustomProperties");
+            return new EasyScoreDirectorFactory<>(solutionDescriptor, easyScoreCalculator);
         } else {
+            if (easyScoreCalculatorCustomProperties != null) {
+                throw new IllegalStateException("If there is no easyScoreCalculatorClass (" + easyScoreCalculatorClass
+                        + "), then there can be no easyScoreCalculatorCustomProperties ("
+                        + easyScoreCalculatorCustomProperties + ") either.");
+            }
             return null;
         }
     }
 
-    protected <Solution_> AbstractScoreDirectorFactory<Solution_> buildIncrementalScoreDirectorFactory() {
+    protected <Solution_> AbstractScoreDirectorFactory<Solution_> buildIncrementalScoreDirectorFactory(
+            SolutionDescriptor<Solution_> solutionDescriptor) {
         if (incrementalScoreCalculatorClass != null) {
             if (!IncrementalScoreCalculator.class.isAssignableFrom(incrementalScoreCalculatorClass)) {
                 throw new IllegalArgumentException(
                         "The incrementalScoreCalculatorClass (" + incrementalScoreCalculatorClass
                         + ") does not implement " + IncrementalScoreCalculator.class.getSimpleName() + ".");
             }
-            return new IncrementalScoreDirectorFactory<>(incrementalScoreCalculatorClass);
+            return new IncrementalScoreDirectorFactory<>(solutionDescriptor, incrementalScoreCalculatorClass,
+                    incrementalScoreCalculatorCustomProperties);
         } else {
+            if (incrementalScoreCalculatorCustomProperties != null) {
+                throw new IllegalStateException("If there is no incrementalScoreCalculatorClass (" + incrementalScoreCalculatorClass
+                        + "), then there can be no incrementalScoreCalculatorCustomProperties ("
+                        + incrementalScoreCalculatorCustomProperties + ") either.");
+            }
             return null;
         }
     }
 
     protected <Solution_> AbstractScoreDirectorFactory<Solution_> buildDroolsScoreDirectorFactory(
-            SolverConfigContext configContext) {
+            SolverConfigContext configContext, SolutionDescriptor<Solution_> solutionDescriptor) {
         KieContainer kieContainer = configContext.getKieContainer();
         if (kieContainer != null || ksessionName != null) {
             if (kieContainer == null) {
@@ -388,7 +465,9 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
             if (!ConfigUtils.isEmptyCollection(scoreDrlList) || !ConfigUtils.isEmptyCollection(scoreDrlFileList)) {
                 throw new IllegalArgumentException("If kieContainer or ksessionName (" + ksessionName
                         + ") is not null, then the scoreDrlList (" + scoreDrlList
-                        + ") and the scoreDrlFileList (" + scoreDrlFileList + ") must be empty.");
+                        + ") and the scoreDrlFileList (" + scoreDrlFileList + ") must be empty.\n"
+                        + "Maybe this is running in a kjar in kie-server, in which case the DRL's are located"
+                        + " by the META-INF/kmodule.xml, so only ksessionName is allowed.");
             }
             if (kieBase != null) {
                 throw new IllegalArgumentException("If kieContainer or ksessionName (" + ksessionName
@@ -399,7 +478,11 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                         + ") is not null, then the kieBaseConfigurationProperties ("
                         + kieBaseConfigurationProperties + ") must be null.");
             }
-            return new DroolsScoreDirectorFactory<>(kieContainer, ksessionName);
+            if (BooleanUtils.isTrue(generateDroolsTestOnError)) {
+                return new TestGenDroolsScoreDirectorFactory<>(solutionDescriptor, kieContainer, ksessionName);
+            } else {
+                return new DroolsScoreDirectorFactory<>(solutionDescriptor, kieContainer, ksessionName);
+            }
         } else if (kieBase != null) {
             if (!ConfigUtils.isEmptyCollection(scoreDrlList) || !ConfigUtils.isEmptyCollection(scoreDrlFileList)) {
                 throw new IllegalArgumentException("If kieBase is not null, then the scoreDrlList (" + scoreDrlList
@@ -409,7 +492,11 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                 throw new IllegalArgumentException("If kieBase is not null, then the kieBaseConfigurationProperties ("
                         + kieBaseConfigurationProperties + ") must be null.");
             }
-            return new LegacyDroolsScoreDirectorFactory<>(kieBase);
+            if (BooleanUtils.isTrue(generateDroolsTestOnError)) {
+                return new TestGenLegacyDroolsScoreDirectorFactory<>(solutionDescriptor, kieBase, null, null);
+            } else {
+                return new LegacyDroolsScoreDirectorFactory<>(solutionDescriptor, kieBase);
+            }
         } else if (!ConfigUtils.isEmptyCollection(scoreDrlList) || !ConfigUtils.isEmptyCollection(scoreDrlFileList)) {
             KieServices kieServices = KieServices.Factory.get();
             KieResources kieResources = kieServices.getResources();
@@ -446,6 +533,13 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                     kieFileSystem.write(kieResources.newFileSystemResource(scoreDrlFile, "UTF-8"));
                 }
             }
+
+            // Can be overwritten by kieBaseConfigurationProperties
+            KieModuleModel kmodel = kieServices.newKieModuleModel()
+                    .setConfigurationProperty(PropertySpecificOption.PROPERTY_NAME,
+                            PropertySpecificOption.ALLOWED.toString());
+            kieFileSystem.writeKModuleXML(kmodel.toXML());
+
             KieBuilder kieBuilder = kieServices.newKieBuilder(kieFileSystem);
             kieBuilder.buildAll();
             Results results = kieBuilder.getResults();
@@ -453,8 +547,7 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                 throw new IllegalStateException("There are errors in a score DRL:\n"
                         + results.toString());
             } else if (results.hasMessages(Message.Level.WARNING)) {
-                logger.warn("There are warning in a score DRL:\n"
-                        + results.toString());
+                logger.warn("There are warning in a score DRL:\n{}", results);
             }
             kieContainer = kieServices.newKieContainer(kieBuilder.getKieModule().getReleaseId());
 
@@ -465,7 +558,11 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
                 }
             }
             KieBase kieBase = kieContainer.newKieBase(kieBaseConfiguration);
-            return new LegacyDroolsScoreDirectorFactory<>(kieBase);
+            if (BooleanUtils.isTrue(generateDroolsTestOnError)) {
+                return new TestGenLegacyDroolsScoreDirectorFactory<>(solutionDescriptor, kieBase, scoreDrlList, scoreDrlFileList);
+            } else {
+                return new LegacyDroolsScoreDirectorFactory<>(solutionDescriptor, kieBase);
+            }
         } else {
             if (kieBaseConfigurationProperties != null) {
                 throw new IllegalArgumentException(
@@ -488,8 +585,12 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
         }
         easyScoreCalculatorClass = ConfigUtils.inheritOverwritableProperty(
                 easyScoreCalculatorClass, inheritedConfig.getEasyScoreCalculatorClass());
+        easyScoreCalculatorCustomProperties = ConfigUtils.inheritMergeableMapProperty(
+                easyScoreCalculatorCustomProperties, inheritedConfig.getEasyScoreCalculatorCustomProperties());
         incrementalScoreCalculatorClass = ConfigUtils.inheritOverwritableProperty(
                 incrementalScoreCalculatorClass, inheritedConfig.getIncrementalScoreCalculatorClass());
+        incrementalScoreCalculatorCustomProperties = ConfigUtils.inheritMergeableMapProperty(
+                incrementalScoreCalculatorCustomProperties, inheritedConfig.getIncrementalScoreCalculatorCustomProperties());
         ksessionName = ConfigUtils.inheritOverwritableProperty(
                 ksessionName, inheritedConfig.getKsessionName());
         kieBase = ConfigUtils.inheritOverwritableProperty(
@@ -505,6 +606,8 @@ public class ScoreDirectorFactoryConfig extends AbstractConfig<ScoreDirectorFact
 
         assertionScoreDirectorFactory = ConfigUtils.inheritOverwritableProperty(
                 assertionScoreDirectorFactory, inheritedConfig.getAssertionScoreDirectorFactory());
+        generateDroolsTestOnError = ConfigUtils.inheritOverwritableProperty(
+                generateDroolsTestOnError, inheritedConfig.isGenerateDroolsTestOnError());
     }
 
 }

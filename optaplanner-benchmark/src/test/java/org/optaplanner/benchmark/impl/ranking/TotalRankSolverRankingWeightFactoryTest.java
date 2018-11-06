@@ -27,7 +27,6 @@ import org.optaplanner.benchmark.impl.result.SingleBenchmarkResult;
 import org.optaplanner.benchmark.impl.result.SolverBenchmarkResult;
 import org.optaplanner.core.api.score.buildin.simple.SimpleScore;
 
-import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 import static org.optaplanner.core.impl.testdata.util.PlannerAssert.*;
 
@@ -131,20 +130,20 @@ public class TotalRankSolverRankingWeightFactoryTest extends AbstractSolverRanki
         Comparable bWeight = factory.createRankingWeight(solverBenchmarkResultList, b);
         assertCompareToEquals(aWeight, bWeight);
 
-        a0.setAverageScore(SimpleScore.valueOf(-100, -1000));
-        b0.setAverageScore(SimpleScore.valueOf(-100, -1000));
+        a0.setAverageAndTotalScoreForTesting(SimpleScore.ofUninitialized(-100, -1000));
+        b0.setAverageAndTotalScoreForTesting(SimpleScore.ofUninitialized(-100, -1000));
         a.accumulateResults(benchmarkReport);
         b.accumulateResults(benchmarkReport);
         // ranks, uninitialized variable counts, total scores and worst scores are equal
         assertCompareToEquals(aWeight, bWeight);
 
-        b0.setAverageScore(SimpleScore.valueOfInitialized(-1000));
-        b1.setAverageScore(SimpleScore.valueOf(-100, -400));
+        b0.setAverageAndTotalScoreForTesting(SimpleScore.of(-1000));
+        b1.setAverageAndTotalScoreForTesting(SimpleScore.ofUninitialized(-100, -400));
         b.accumulateResults(benchmarkReport);
         // ranks, uninitialized variable counts and total scores are equal, A loses on worst score (tie-breaker)
         assertCompareToOrder(aWeight, bWeight);
 
-        b1.setAverageScore(SimpleScore.valueOf(-101, -400));
+        b1.setAverageAndTotalScoreForTesting(SimpleScore.ofUninitialized(-101, -400));
         b.accumulateResults(benchmarkReport);
         // ranks are equal, uninitialized variable count is bigger in B
         assertCompareToOrder(bWeight, aWeight);
@@ -251,7 +250,7 @@ public class TotalRankSolverRankingWeightFactoryTest extends AbstractSolverRanki
     }
 
     @Test
-    public void overlappingPlannnerBenchmarks() {
+    public void overlappingPlannerBenchmarks() {
         SingleBenchmarkResult a0 = addSingleBenchmark(aSingleBenchmarkResultList, -1000, -30, -1000);
         SingleBenchmarkResult a1 = addSingleBenchmark(aSingleBenchmarkResultList, -400, -30, -1000);
         SingleBenchmarkResult a2 = addSingleBenchmark(aSingleBenchmarkResultList, -30, -30, -1000);

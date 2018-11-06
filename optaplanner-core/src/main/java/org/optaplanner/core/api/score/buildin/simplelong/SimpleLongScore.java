@@ -27,18 +27,36 @@ import org.optaplanner.core.api.score.Score;
  */
 public final class SimpleLongScore extends AbstractScore<SimpleLongScore> {
 
+    public static final SimpleLongScore ZERO = new SimpleLongScore(0, 0L);
+
     public static SimpleLongScore parseScore(String scoreString) {
         String[] scoreTokens = parseScoreTokens(SimpleLongScore.class, scoreString, "");
         int initScore = parseInitScore(SimpleLongScore.class, scoreString, scoreTokens[0]);
         long score = parseLevelAsLong(SimpleLongScore.class, scoreString, scoreTokens[1]);
-        return valueOf(initScore, score);
+        return ofUninitialized(initScore, score);
     }
 
-    public static SimpleLongScore valueOf(int initScore, long score) {
+    public static SimpleLongScore ofUninitialized(int initScore, long score) {
         return new SimpleLongScore(initScore, score);
     }
 
-    public static SimpleLongScore valueOfInitialized(long score) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, long)}
+     */
+    @Deprecated
+    public static SimpleLongScore valueOfUninitialized(int initScore, long score) {
+        return new SimpleLongScore(initScore, score);
+    }
+
+    public static SimpleLongScore of(long score) {
+        return new SimpleLongScore(0, score);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(long)}
+     */
+    @Deprecated
+    public static SimpleLongScore valueOf(long score) {
         return new SimpleLongScore(0, score);
     }
 
@@ -81,6 +99,12 @@ public final class SimpleLongScore extends AbstractScore<SimpleLongScore> {
     @Override
     public SimpleLongScore toInitializedScore() {
         return initScore == 0 ? this : new SimpleLongScore(0, score);
+    }
+
+    @Override
+    public SimpleLongScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new SimpleLongScore(newInitScore, score);
     }
 
     @Override
@@ -128,6 +152,7 @@ public final class SimpleLongScore extends AbstractScore<SimpleLongScore> {
         return new Number[]{score};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -141,10 +166,11 @@ public final class SimpleLongScore extends AbstractScore<SimpleLongScore> {
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return (((17 * 37)
-                + initScore)) * 37
+        return ((17 * 37)
+                + initScore) * 37
                 + Long.valueOf(score).hashCode();
     }
 
@@ -159,8 +185,18 @@ public final class SimpleLongScore extends AbstractScore<SimpleLongScore> {
     }
 
     @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((Long) n).longValue() != 0L, "");
+    }
+
+    @Override
     public String toString() {
         return getInitPrefix() + score;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof SimpleLongScore;
     }
 
 }

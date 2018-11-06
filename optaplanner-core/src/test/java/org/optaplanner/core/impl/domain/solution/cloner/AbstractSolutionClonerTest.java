@@ -38,6 +38,8 @@ import org.optaplanner.core.impl.testdata.domain.chained.TestdataChainedAnchor;
 import org.optaplanner.core.impl.testdata.domain.chained.TestdataChainedEntity;
 import org.optaplanner.core.impl.testdata.domain.chained.TestdataChainedObject;
 import org.optaplanner.core.impl.testdata.domain.chained.TestdataChainedSolution;
+import org.optaplanner.core.impl.testdata.domain.collection.TestdataArrayBasedEntity;
+import org.optaplanner.core.impl.testdata.domain.collection.TestdataArrayBasedSolution;
 import org.optaplanner.core.impl.testdata.domain.collection.TestdataEntityCollectionPropertyEntity;
 import org.optaplanner.core.impl.testdata.domain.collection.TestdataEntityCollectionPropertySolution;
 import org.optaplanner.core.impl.testdata.domain.collection.TestdataSetBasedEntity;
@@ -91,6 +93,7 @@ public abstract class AbstractSolutionClonerTest {
         assertNotSame(original, clone);
         assertCode("solution", clone);
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -135,6 +138,7 @@ public abstract class AbstractSolutionClonerTest {
         assertNotSame(original, clone);
         assertCode("solution", clone);
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataFieldAnnotatedEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -184,6 +188,7 @@ public abstract class AbstractSolutionClonerTest {
         assertEquals(original.getFinalField(), clone.getFinalField());
         assertEquals("readHello", clone.getReadOnlyField());
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -230,6 +235,7 @@ public abstract class AbstractSolutionClonerTest {
         assertCode("solution", clone);
         assertEquals("extraObjectOnSolution", clone.getExtraObject());
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -280,6 +286,7 @@ public abstract class AbstractSolutionClonerTest {
         assertCode("solution", clone);
         assertEquals("extraObjectOnSolution", clone.getExtraObject());
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataThirdPartyEntityPojo> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -351,6 +358,7 @@ public abstract class AbstractSolutionClonerTest {
         assertNotSame(original, clone);
         assertCode("solution", clone);
         assertSame(anchorList, clone.getChainedAnchorList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataChainedEntity> cloneEntityList = clone.getChainedEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -392,20 +400,13 @@ public abstract class AbstractSolutionClonerTest {
         TestdataSetBasedEntity d = new TestdataSetBasedEntity("d", val3);
 
         TestdataSetBasedSolution original = new TestdataSetBasedSolution("solution");
-        Comparator<TestdataValue> valueComparator = new Comparator<TestdataValue>() {
-            @Override
-            public int compare(TestdataValue a, TestdataValue b) {
-                return b.getCode().compareTo(a.getCode()); // Reverse alphabetic
-            }
-        };
-        Set<TestdataValue> valueSet = new TreeSet<>(valueComparator);
+        Set<TestdataValue> valueSet = new TreeSet<>((a1, b1) -> {
+            return b1.getCode().compareTo(a1.getCode()); // Reverse alphabetic
+        });
         valueSet.addAll(Arrays.asList(val1, val2, val3));
         original.setValueSet(valueSet);
-        Comparator<TestdataSetBasedEntity> entityComparator = new Comparator<TestdataSetBasedEntity>() {
-            @Override
-            public int compare(TestdataSetBasedEntity a, TestdataSetBasedEntity b) {
-                return b.getCode().compareTo(a.getCode()); // Reverse alphabetic
-            }
+        Comparator<TestdataSetBasedEntity> entityComparator = (a1, b1) -> {
+            return b1.getCode().compareTo(a1.getCode()); // Reverse alphabetic
         };
         Set<TestdataSetBasedEntity> originalEntitySet = new TreeSet<>(entityComparator);
         originalEntitySet.addAll(Arrays.asList(a, b, c, d));
@@ -414,6 +415,7 @@ public abstract class AbstractSolutionClonerTest {
         TestdataSetBasedSolution clone = cloner.cloneSolution(original);
         assertNotSame(original, clone);
         assertSame(valueSet, clone.getValueSet());
+        assertEquals(original.getScore(), clone.getScore());
 
         Set<TestdataSetBasedEntity> cloneEntitySet = clone.getEntitySet();
         assertNotSame(originalEntitySet, cloneEntitySet);
@@ -468,7 +470,7 @@ public abstract class AbstractSolutionClonerTest {
         a.setStringToEntityListMap(new HashMap<>());
         a.getStringToEntityListMap().put("bc", Arrays.asList(b, c));
 
-        b.setEntityList(Collections.<TestdataEntityCollectionPropertyEntity>emptyList());
+        b.setEntityList(Collections.emptyList());
         b.setEntitySet(new HashSet<>());
         b.setStringToEntityMap(new HashMap<>());
         b.setEntityToStringMap(null);
@@ -493,6 +495,7 @@ public abstract class AbstractSolutionClonerTest {
         assertNotSame(original, clone);
         assertCode("solution", clone);
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataEntityCollectionPropertyEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
@@ -552,6 +555,66 @@ public abstract class AbstractSolutionClonerTest {
     }
 
     @Test
+    public void cloneEntityArrayPropertySolution() {
+        SolutionDescriptor solutionDescriptor = TestdataArrayBasedSolution.buildSolutionDescriptor();
+        SolutionCloner<TestdataArrayBasedSolution> cloner = createSolutionCloner(solutionDescriptor);
+
+        TestdataValue val1 = new TestdataValue("1");
+        TestdataValue val2 = new TestdataValue("2");
+        TestdataValue val3 = new TestdataValue("3");
+        TestdataArrayBasedEntity a = new TestdataArrayBasedEntity("a", val1);
+        TestdataArrayBasedEntity b = new TestdataArrayBasedEntity("b", val1);
+        TestdataArrayBasedEntity c = new TestdataArrayBasedEntity("c", val3);
+        a.setEntities(new TestdataArrayBasedEntity[] {b, c});
+
+        b.setEntities(new TestdataArrayBasedEntity[] {});
+
+        c.setEntities(new TestdataArrayBasedEntity[] {a, c});
+
+        TestdataArrayBasedSolution original = new TestdataArrayBasedSolution("solution");
+        TestdataValue[] values = new TestdataValue[]{val1, val2, val3};
+        original.setValues(values);
+        TestdataArrayBasedEntity[] originalEntities = new TestdataArrayBasedEntity[]{a, b, c};
+        original.setEntities(originalEntities);
+
+        TestdataArrayBasedSolution clone = cloner.cloneSolution(original);
+
+        assertNotSame(original, clone);
+        assertCode("solution", clone);
+        assertSame(values, clone.getValues());
+        assertEquals(original.getScore(), clone.getScore());
+
+        TestdataArrayBasedEntity[] cloneEntities = clone.getEntities();
+        assertNotSame(originalEntities, cloneEntities);
+        assertEquals(3, cloneEntities.length);
+        TestdataArrayBasedEntity cloneA = cloneEntities[0];
+        TestdataArrayBasedEntity cloneB = cloneEntities[1];
+        TestdataArrayBasedEntity cloneC = cloneEntities[2];
+
+        assertEntityArrayPropertyEntityClone(a, cloneA, "a", "1");
+        assertNotSame(a.getEntities(), cloneA.getEntities());
+        assertEquals(2, cloneA.getEntities().length);
+        assertSame(cloneB, cloneA.getEntities()[0]);
+        assertSame(cloneC, cloneA.getEntities()[1]);
+
+        assertEntityArrayPropertyEntityClone(b, cloneB, "b", "1");
+        assertEquals(0, cloneB.getEntities().length);
+
+        assertEntityArrayPropertyEntityClone(c, cloneC, "c", "3");
+        assertEquals(2, cloneC.getEntities().length);
+        assertSame(cloneA, cloneC.getEntities()[0]);
+        assertSame(cloneC, cloneC.getEntities()[1]);
+    }
+
+    private void assertEntityArrayPropertyEntityClone(TestdataArrayBasedEntity originalEntity,
+            TestdataArrayBasedEntity cloneEntity, String entityCode, String valueCode) {
+        assertNotSame(originalEntity, cloneEntity);
+        assertCode(entityCode, originalEntity);
+        assertCode(entityCode, cloneEntity);
+        assertCode(valueCode, cloneEntity.getValue());
+    }
+
+    @Test
     public void deepPlanningClone() {
         SolutionDescriptor solutionDescriptor = TestdataDeepCloningSolution.buildSolutionDescriptor();
         SolutionCloner<TestdataDeepCloningSolution> cloner = createSolutionCloner(solutionDescriptor);
@@ -585,18 +648,19 @@ public abstract class AbstractSolutionClonerTest {
         assertNotSame(original, clone);
         assertCode("solution", clone);
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataDeepCloningEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
         assertEquals(4, cloneEntityList.size());
         TestdataDeepCloningEntity cloneA = cloneEntityList.get(0);
-        assertDeepCloningEntityClone(a, cloneA, "a", "1");
+        assertDeepCloningEntityClone(a, cloneA, "a");
         TestdataDeepCloningEntity cloneB = cloneEntityList.get(1);
-        assertDeepCloningEntityClone(b, cloneB, "b", "1");
+        assertDeepCloningEntityClone(b, cloneB, "b");
         TestdataDeepCloningEntity cloneC = cloneEntityList.get(2);
-        assertDeepCloningEntityClone(c, cloneC, "c", "3");
+        assertDeepCloningEntityClone(c, cloneC, "c");
         TestdataDeepCloningEntity cloneD = cloneEntityList.get(3);
-        assertDeepCloningEntityClone(d, cloneD, "d", "3");
+        assertDeepCloningEntityClone(d, cloneD, "d");
 
         List<String> cloneGeneralShadowVariableList = clone.getGeneralShadowVariableList();
         assertNotSame(generalShadowVariableList, cloneGeneralShadowVariableList);
@@ -616,7 +680,7 @@ public abstract class AbstractSolutionClonerTest {
     }
 
     private void assertDeepCloningEntityClone(TestdataDeepCloningEntity originalEntity, TestdataDeepCloningEntity cloneEntity,
-            String entityCode, String valueCode) {
+            String entityCode) {
         assertNotSame(originalEntity, cloneEntity);
         assertCode(entityCode, originalEntity);
         assertCode(entityCode, cloneEntity);
@@ -681,18 +745,19 @@ public abstract class AbstractSolutionClonerTest {
         assertNotSame(original, clone);
         assertCode("solution", clone);
         assertSame(valueList, clone.getValueList());
+        assertEquals(original.getScore(), clone.getScore());
 
         List<TestdataFieldAnnotatedDeepCloningEntity> cloneEntityList = clone.getEntityList();
         assertNotSame(originalEntityList, cloneEntityList);
         assertEquals(4, cloneEntityList.size());
         TestdataFieldAnnotatedDeepCloningEntity cloneA = cloneEntityList.get(0);
-        assertDeepCloningEntityClone(a, cloneA, "a", "1");
+        assertDeepCloningEntityClone(a, cloneA, "a");
         TestdataFieldAnnotatedDeepCloningEntity cloneB = cloneEntityList.get(1);
-        assertDeepCloningEntityClone(b, cloneB, "b", "1");
+        assertDeepCloningEntityClone(b, cloneB, "b");
         TestdataFieldAnnotatedDeepCloningEntity cloneC = cloneEntityList.get(2);
-        assertDeepCloningEntityClone(c, cloneC, "c", "3");
+        assertDeepCloningEntityClone(c, cloneC, "c");
         TestdataFieldAnnotatedDeepCloningEntity cloneD = cloneEntityList.get(3);
-        assertDeepCloningEntityClone(d, cloneD, "d", "3");
+        assertDeepCloningEntityClone(d, cloneD, "d");
 
         List<String> cloneGeneralShadowVariableList = clone.getGeneralShadowVariableList();
         assertNotSame(generalShadowVariableList, cloneGeneralShadowVariableList);
@@ -712,7 +777,7 @@ public abstract class AbstractSolutionClonerTest {
     }
 
     private void assertDeepCloningEntityClone(TestdataFieldAnnotatedDeepCloningEntity originalEntity, TestdataFieldAnnotatedDeepCloningEntity cloneEntity,
-            String entityCode, String valueCode) {
+            String entityCode) {
         assertNotSame(originalEntity, cloneEntity);
         assertCode(entityCode, originalEntity);
         assertCode(entityCode, cloneEntity);

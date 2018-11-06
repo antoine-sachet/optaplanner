@@ -18,12 +18,14 @@
 package org.optaplanner.core.impl.domain.common;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -98,16 +100,16 @@ public final class ReflectionHelper {
      * @param propertyName never null
      * @return true if that getter exists
      */
-    public static boolean hasGetterMethod(Class containingClass, String propertyName) {
+    public static boolean hasGetterMethod(Class<?> containingClass, String propertyName) {
         return getGetterMethod(containingClass, propertyName) != null;
     }
 
     /**
      * @param containingClass never null
      * @param propertyName never null
-     * @return true if that getter exists
+     * @return sometimes null
      */
-    public static Method getGetterMethod(Class containingClass, String propertyName) {
+    public static Method getGetterMethod(Class<?> containingClass, String propertyName) {
         String getterName = PROPERTY_ACCESSOR_PREFIX_GET
                 + (propertyName.isEmpty() ? "" : propertyName.substring(0, 1).toUpperCase() + propertyName.substring(1));
         try {
@@ -130,11 +132,33 @@ public final class ReflectionHelper {
 
     /**
      * @param containingClass never null
+     * @param fieldName never null
+     * @return true if that field exists
+     */
+    public static boolean hasField(Class<?> containingClass, String fieldName) {
+        return getField(containingClass, fieldName) != null;
+    }
+
+    /**
+     * @param containingClass never null
+     * @param fieldName never null
+     * @return sometimes null
+     */
+    public static Field getField(Class<?> containingClass, String fieldName) {
+        try {
+            return containingClass.getField(fieldName);
+        } catch (NoSuchFieldException e) {
+            return null;
+        }
+    }
+
+    /**
+     * @param containingClass never null
      * @param propertyType never null
      * @param propertyName never null
      * @return null if it doesn't exist
      */
-    public static Method getSetterMethod(Class containingClass, Class propertyType, String propertyName) {
+    public static Method getSetterMethod(Class<?> containingClass, Class<?> propertyType, String propertyName) {
         String setterName = PROPERTY_MUTATOR_PREFIX
                 + (propertyName.isEmpty() ? "" : propertyName.substring(0, 1).toUpperCase() + propertyName.substring(1));
         try {
@@ -142,6 +166,38 @@ public final class ReflectionHelper {
         } catch (NoSuchMethodException e) {
             return null;
         }
+    }
+
+    /**
+     * @param containingClass never null
+     * @param propertyName never null
+     * @return null if it doesn't exist
+     */
+    public static Method getSetterMethod(Class<?> containingClass, String propertyName) {
+        String setterName = PROPERTY_MUTATOR_PREFIX
+                + (propertyName.isEmpty() ? "" : propertyName.substring(0, 1).toUpperCase() + propertyName.substring(1));
+        Method[] methods = Arrays.stream(containingClass.getMethods())
+                .filter(method -> method.getName().equals(setterName))
+                .toArray(Method[]::new);
+        if (methods.length == 0) {
+            return null;
+        }
+        if (methods.length > 1) {
+            throw new IllegalStateException("The containingClass (" + containingClass
+                    + ") has multiple setter methods (" + Arrays.toString(methods)
+                    + ") with the propertyName (" + propertyName + ").");
+        }
+        return methods[0];
+    }
+
+    public static boolean isMethodOverwritten(Method parentMethod, Class<?> childClass) {
+        Method leafMethod;
+        try {
+            leafMethod = childClass.getDeclaredMethod(parentMethod.getName(), parentMethod.getParameterTypes());
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+        return !leafMethod.getDeclaringClass().equals(parentMethod.getClass());
     }
 
     public static void assertGetterMethod(Method getterMethod, Class<? extends Annotation> annotationClass) {
@@ -219,6 +275,18 @@ public final class ReflectionHelper {
             return upperBounds.length != 0 && isList(upperBounds[0]);
         }
         return false;
+    }
+
+    public static List<Object> transformArrayToList(Object arrayObject) {
+        if (arrayObject == null) {
+            return null;
+        }
+        int arrayLength = Array.getLength(arrayObject);
+        List<Object> list = new ArrayList<>(arrayLength);
+        for (int i = 0; i < arrayLength; i++) {
+            list.add(Array.get(arrayObject, i));
+        }
+        return list;
     }
 
     private ReflectionHelper() {

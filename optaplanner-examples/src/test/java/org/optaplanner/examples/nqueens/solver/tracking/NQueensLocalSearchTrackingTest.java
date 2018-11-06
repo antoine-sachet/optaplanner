@@ -1,3 +1,19 @@
+/*
+ * Copyright 2015 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.optaplanner.examples.nqueens.solver.tracking;
 
 import java.util.ArrayList;
@@ -47,7 +63,7 @@ public class NQueensLocalSearchTrackingTest extends NQueensAbstractTrackingTest 
         SolverConfig solverConfig = solverFactory.getSolverConfig();
 
         NQueensGenerator generator = new NQueensGenerator();
-        NQueens planningProblem = NQueensSolutionInitializer.initialize(generator.createNQueens(N));
+        NQueens problem = NQueensSolutionInitializer.initialize(generator.createNQueens(N));
 
         LocalSearchPhaseConfig localSearchPhaseConfig = new LocalSearchPhaseConfig();
         localSearchPhaseConfig.setAcceptorConfig(acceptorConfig);
@@ -55,14 +71,13 @@ public class NQueensLocalSearchTrackingTest extends NQueensAbstractTrackingTest 
         localSearchPhaseConfig.getForagerConfig().setBreakTieRandomly(false);
         localSearchPhaseConfig.setMoveSelectorConfig(new ChangeMoveSelectorConfig());
         localSearchPhaseConfig.getMoveSelectorConfig().setSelectionOrder(SelectionOrder.ORIGINAL);
-        localSearchPhaseConfig.setTerminationConfig(new TerminationConfig());
-        localSearchPhaseConfig.getTerminationConfig().setStepCountLimit(20);
+        localSearchPhaseConfig.setTerminationConfig(new TerminationConfig().withStepCountLimit(20));
         solverConfig.getPhaseConfigList().set(1, localSearchPhaseConfig);
 
         NQueensStepTracker listener = new NQueensStepTracker();
         DefaultSolver<NQueens> solver = (DefaultSolver<NQueens>) solverFactory.buildSolver();
         solver.addPhaseLifecycleListener(listener);
-        NQueens bestSolution = solver.solve(planningProblem);
+        NQueens bestSolution = solver.solve(problem);
 
         assertNotNull(bestSolution);
         assertTrackingList(expectedCoordinates, listener.getTrackingList());

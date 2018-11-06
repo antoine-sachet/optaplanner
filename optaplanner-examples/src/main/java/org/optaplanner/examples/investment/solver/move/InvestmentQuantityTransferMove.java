@@ -21,11 +21,11 @@ import java.util.Collection;
 import java.util.Collections;
 
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.examples.investment.domain.AssetClassAllocation;
+import org.optaplanner.examples.investment.domain.InvestmentSolution;
 
-public class InvestmentQuantityTransferMove extends AbstractMove {
+public class InvestmentQuantityTransferMove extends AbstractMove<InvestmentSolution> {
 
     private final AssetClassAllocation fromAssetClassAllocation;
     private final AssetClassAllocation toAssetClassAllocation;
@@ -38,23 +38,31 @@ public class InvestmentQuantityTransferMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<InvestmentSolution> scoreDirector) {
         return true;
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public InvestmentQuantityTransferMove createUndoMove(ScoreDirector<InvestmentSolution> scoreDirector) {
         return new InvestmentQuantityTransferMove(toAssetClassAllocation, fromAssetClassAllocation, transferMillis);
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<InvestmentSolution> scoreDirector) {
         scoreDirector.beforeVariableChanged(fromAssetClassAllocation, "quantityMillis");
         fromAssetClassAllocation.setQuantityMillis(fromAssetClassAllocation.getQuantityMillis() - transferMillis);
         scoreDirector.afterVariableChanged(fromAssetClassAllocation, "quantityMillis");
         scoreDirector.beforeVariableChanged(toAssetClassAllocation, "quantityMillis");
         toAssetClassAllocation.setQuantityMillis(toAssetClassAllocation.getQuantityMillis() + transferMillis);
         scoreDirector.afterVariableChanged(toAssetClassAllocation, "quantityMillis");
+    }
+
+    @Override
+    public InvestmentQuantityTransferMove rebase(ScoreDirector<InvestmentSolution> destinationScoreDirector) {
+        return new InvestmentQuantityTransferMove(
+                destinationScoreDirector.lookUpWorkingObject(fromAssetClassAllocation),
+                destinationScoreDirector.lookUpWorkingObject(toAssetClassAllocation),
+                transferMillis);
     }
 
     @Override

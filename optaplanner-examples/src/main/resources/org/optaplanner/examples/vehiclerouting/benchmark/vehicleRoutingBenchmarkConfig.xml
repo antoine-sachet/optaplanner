@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/vehiclerouting</benchmarkDirectory>
   <parallelBenchmarkCount>AUTO</parallelBenchmarkCount>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -15,8 +14,14 @@
       <inputSolutionFile>data/vehiclerouting/import/belgium/basic/air/belgium-n2750-k55.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-km/belgium-road-km-n50-k10.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-km/belgium-road-km-n100-k10.vrp</inputSolutionFile>
+      <inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-km/belgium-road-km-n500-k20.vrp</inputSolutionFile>
+      <!--<inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-km/belgium-road-km-n1000-k20.vrp</inputSolutionFile>--><!-- Too big to include in git -->
+      <!--<inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-km/belgium-road-km-n2750-k55.vrp</inputSolutionFile>--><!-- Too big to include in git -->
       <inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-time/belgium-road-time-n50-k10.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-time/belgium-road-time-n100-k10.vrp</inputSolutionFile>
+      <inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-time/belgium-road-time-n500-k20.vrp</inputSolutionFile>
+      <!--<inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-time/belgium-road-time-n1000-k20.vrp</inputSolutionFile>--><!-- Too big to include in git -->
+      <!--<inputSolutionFile>data/vehiclerouting/import/belgium/basic/road-time/belgium-road-time-n2750-k55.vrp</inputSolutionFile>--><!-- Too big to include in git -->
       <!-- USA datasets -->
       <inputSolutionFile>data/vehiclerouting/import/usa/basic/air/usa-n100-k10.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/usa/basic/air/usa-n500-k20.vrp</inputSolutionFile>
@@ -98,7 +103,7 @@
       <inputSolutionFile>data/vehiclerouting/import/vrpweb/timewindowed/air/Homberger_1000_R210_1.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/vrpweb/timewindowed/air/Homberger_1000_RC110_1.vrp</inputSolutionFile>
       <inputSolutionFile>data/vehiclerouting/import/vrpweb/timewindowed/air/Homberger_1000_RC210_1.vrp</inputSolutionFile>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
+      <!--<problemStatisticType>BEST_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>STEP_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>SCORE_CALCULATION_SPEED</problemStatisticType>-->
       <!--<problemStatisticType>BEST_SOLUTION_MUTATION</problemStatisticType>-->
@@ -118,7 +123,6 @@
       <entityClass>org.optaplanner.examples.vehiclerouting.domain.timewindowed.TimeWindowedCustomer</entityClass>
 
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT_LONG</scoreDefinitionType>
         <incrementalScoreCalculatorClass>org.optaplanner.examples.vehiclerouting.solver.score.VehicleRoutingIncrementalScoreCalculator</incrementalScoreCalculatorClass>
         <!--<scoreDrl>org/optaplanner/examples/vehiclerouting/solver/vehicleRoutingScoreRules.drl</scoreDrl>-->
         <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>

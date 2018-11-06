@@ -30,18 +30,36 @@ import org.optaplanner.core.api.score.Score;
  */
 public final class SimpleBigDecimalScore extends AbstractScore<SimpleBigDecimalScore> {
 
+    public static final SimpleBigDecimalScore ZERO = new SimpleBigDecimalScore(0, BigDecimal.ZERO);
+
     public static SimpleBigDecimalScore parseScore(String scoreString) {
         String[] scoreTokens = parseScoreTokens(SimpleBigDecimalScore.class, scoreString, "");
         int initScore = parseInitScore(SimpleBigDecimalScore.class, scoreString, scoreTokens[0]);
         BigDecimal score = parseLevelAsBigDecimal(SimpleBigDecimalScore.class, scoreString, scoreTokens[1]);
-        return valueOf(initScore, score);
+        return ofUninitialized(initScore, score);
     }
 
-    public static SimpleBigDecimalScore valueOf(int initScore, BigDecimal score) {
+    public static SimpleBigDecimalScore ofUninitialized(int initScore, BigDecimal score) {
         return new SimpleBigDecimalScore(initScore, score);
     }
 
-    public static SimpleBigDecimalScore valueOfInitialized(BigDecimal score) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, BigDecimal)}
+     */
+    @Deprecated
+    public static SimpleBigDecimalScore valueOfUninitialized(int initScore, BigDecimal score) {
+        return new SimpleBigDecimalScore(initScore, score);
+    }
+
+    public static SimpleBigDecimalScore of(BigDecimal score) {
+        return new SimpleBigDecimalScore(0, score);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(BigDecimal)}
+     */
+    @Deprecated
+    public static SimpleBigDecimalScore valueOf(BigDecimal score) {
         return new SimpleBigDecimalScore(0, score);
     }
 
@@ -84,6 +102,12 @@ public final class SimpleBigDecimalScore extends AbstractScore<SimpleBigDecimalS
     @Override
     public SimpleBigDecimalScore toInitializedScore() {
         return initScore == 0 ? this : new SimpleBigDecimalScore(0, score);
+    }
+
+    @Override
+    public SimpleBigDecimalScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new SimpleBigDecimalScore(newInitScore, score);
     }
 
     @Override
@@ -132,7 +156,7 @@ public final class SimpleBigDecimalScore extends AbstractScore<SimpleBigDecimalS
         // None of the normal Java libraries support BigDecimal.pow(BigDecimal)
         return new SimpleBigDecimalScore(
                 (int) Math.floor(Math.pow(initScore, exponent)),
-                score.pow(exponentBigDecimal.intValue()).setScale(score.scale()));
+                score.pow(exponentBigDecimal.intValue()).setScale(score.scale(), RoundingMode.FLOOR));
     }
 
     @Override
@@ -145,6 +169,7 @@ public final class SimpleBigDecimalScore extends AbstractScore<SimpleBigDecimalS
         return new Number[]{score};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -152,17 +177,18 @@ public final class SimpleBigDecimalScore extends AbstractScore<SimpleBigDecimalS
         } else if (o instanceof SimpleBigDecimalScore) {
             SimpleBigDecimalScore other = (SimpleBigDecimalScore) o;
             return initScore == other.getInitScore()
-                    && score.equals(other.getScore());
+                    && score.stripTrailingZeros().equals(other.getScore().stripTrailingZeros());
         } else {
             return false;
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return (((17 * 37)
-                + initScore)) * 37
-                + score.hashCode();
+        return ((17 * 37)
+                + initScore) * 37
+                + score.stripTrailingZeros().hashCode();
     }
 
     @Override
@@ -176,8 +202,18 @@ public final class SimpleBigDecimalScore extends AbstractScore<SimpleBigDecimalS
     }
 
     @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((BigDecimal) n).compareTo(BigDecimal.ZERO) != 0, "");
+    }
+
+    @Override
     public String toString() {
         return getInitPrefix() + score;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof SimpleBigDecimalScore;
     }
 
 }

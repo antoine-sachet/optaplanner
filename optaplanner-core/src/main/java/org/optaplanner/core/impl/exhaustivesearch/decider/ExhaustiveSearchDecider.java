@@ -27,7 +27,6 @@ import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.heuristic.selector.entity.mimic.ManualEntityMimicRecorder;
 import org.optaplanner.core.impl.heuristic.selector.move.MoveSelector;
 import org.optaplanner.core.impl.score.director.InnerScoreDirector;
-import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.core.impl.solver.recaller.BestSolutionRecaller;
 import org.optaplanner.core.impl.solver.scope.DefaultSolverScope;
 import org.optaplanner.core.impl.solver.termination.Termination;
@@ -38,6 +37,7 @@ public class ExhaustiveSearchDecider<Solution_> implements ExhaustiveSearchPhase
 
     protected final transient Logger logger = LoggerFactory.getLogger(getClass());
 
+    protected final String logIndentation;
     protected final BestSolutionRecaller<Solution_> bestSolutionRecaller;
     protected final Termination termination;
     protected final ManualEntityMimicRecorder manualEntityMimicRecorder;
@@ -48,9 +48,11 @@ public class ExhaustiveSearchDecider<Solution_> implements ExhaustiveSearchPhase
     protected boolean assertMoveScoreFromScratch = false;
     protected boolean assertExpectedUndoMoveScore = false;
 
-    public ExhaustiveSearchDecider(BestSolutionRecaller<Solution_> bestSolutionRecaller, Termination termination,
+    public ExhaustiveSearchDecider(String logIndentation,
+            BestSolutionRecaller<Solution_> bestSolutionRecaller, Termination termination,
             ManualEntityMimicRecorder manualEntityMimicRecorder, MoveSelector moveSelector,
             boolean scoreBounderEnabled, ScoreBounder scoreBounder) {
+        this.logIndentation = logIndentation;
         this.bestSolutionRecaller = bestSolutionRecaller;
         this.termination = termination;
         this.manualEntityMimicRecorder = manualEntityMimicRecorder;
@@ -124,13 +126,16 @@ public class ExhaustiveSearchDecider<Solution_> implements ExhaustiveSearchPhase
 
         int moveIndex = 0;
         ExhaustiveSearchLayer moveLayer = stepScope.getPhaseScope().getLayerList().get(expandingNode.getDepth() + 1);
-        for (Move move : moveSelector) {
+        for (Move<?> move : moveSelector) {
             ExhaustiveSearchNode moveNode = new ExhaustiveSearchNode(moveLayer, expandingNode);
             moveIndex++;
             moveNode.setMove(move);
             // Do not filter out pointless moves, because the original value of the entity(s) is irrelevant.
             // If the original value is null and the variable is nullable, the move to null must be done too.
             doMove(stepScope, moveNode);
+            // TODO in the lowest level (and only in that level) QuitEarly can be useful
+            // No QuitEarly because lower layers might be promising
+            stepScope.getPhaseScope().getSolverScope().checkYielding();
             if (termination.isPhaseTerminated(stepScope.getPhaseScope())) {
                 break;
             }
@@ -139,21 +144,21 @@ public class ExhaustiveSearchDecider<Solution_> implements ExhaustiveSearchPhase
     }
 
     private void doMove(ExhaustiveSearchStepScope<Solution_> stepScope, ExhaustiveSearchNode moveNode) {
-        ScoreDirector scoreDirector = stepScope.getScoreDirector();
-        Move move = moveNode.getMove();
-        Move undoMove = move.createUndoMove(scoreDirector);
+        InnerScoreDirector<Solution_> scoreDirector = stepScope.getScoreDirector();
+        // TODO reuse scoreDirector.doAndProcessMove() unless it's an expandableNode
+        Move<Solution_> move = moveNode.getMove();
+        Move<Solution_> undoMove = move.doMove(scoreDirector);
         moveNode.setUndoMove(undoMove);
-        move.doMove(scoreDirector);
         processMove(stepScope, moveNode);
         undoMove.doMove(scoreDirector);
         if (assertExpectedUndoMoveScore) {
-            ExhaustiveSearchPhaseScope phaseScope = stepScope.getPhaseScope();
             // In BRUTE_FORCE a stepScore can be null because it was not calculated
             if (stepScope.getStartingStepScore() != null) {
-                phaseScope.assertExpectedUndoMoveScore(move, undoMove, stepScope.getStartingStepScore());
+                scoreDirector.assertExpectedUndoMoveScore(move, stepScope.getStartingStepScore());
             }
         }
-        logger.trace("        Move treeId ({}), score ({}), expandable ({}), move ({}).",
+        logger.trace("{}        Move treeId ({}), score ({}), expandable ({}), move ({}).",
+                logIndentation,
                 moveNode.getTreeId(), moveNode.getScore(), moveNode.isExpandable(), moveNode.getMove());
     }
 

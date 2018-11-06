@@ -40,12 +40,13 @@ public class CheapTimePillarSlideMoveIteratorFactory implements MoveIteratorFact
     }
 
     @Override
-    public Iterator<Move> createOriginalMoveIterator(ScoreDirector<CheapTimeSolution> scoreDirector) {
+    public Iterator<Move<CheapTimeSolution>> createOriginalMoveIterator(ScoreDirector<CheapTimeSolution> scoreDirector) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Iterator<Move> createRandomMoveIterator(ScoreDirector<CheapTimeSolution> scoreDirector, Random workingRandom) {
+    public RandomCheapTimePillarSlideMoveIterator createRandomMoveIterator(ScoreDirector<CheapTimeSolution> scoreDirector,
+            Random workingRandom) {
         CheapTimeSolution cheapTimeSolution = scoreDirector.getWorkingSolution();
         Map<Machine, List<TaskAssignment>> positivePillarMap = new LinkedHashMap<>(
                 cheapTimeSolution.getGlobalPeriodRangeTo());
@@ -59,19 +60,13 @@ public class CheapTimePillarSlideMoveIteratorFactory implements MoveIteratorFact
             Integer startPeriod = taskAssignment.getStartPeriod();
             if (startPeriod != null) {
                 if (startPeriod < task.getStartPeriodRangeTo() - 1) {
-                    List<TaskAssignment> pillar = positivePillarMap.get(machine);
-                    if (pillar == null) {
-                        pillar = new ArrayList<>(pillarCapacity);
-                        positivePillarMap.put(machine, pillar);
-                    }
+                    List<TaskAssignment> pillar = positivePillarMap.computeIfAbsent(machine,
+                            k -> new ArrayList<>(pillarCapacity));
                     pillar.add(taskAssignment);
                 }
                 if (startPeriod > task.getStartPeriodRangeFrom()) {
-                    List<TaskAssignment> pillar = negativePillarMap.get(machine);
-                    if (pillar == null) {
-                        pillar = new ArrayList<>(pillarCapacity);
-                        negativePillarMap.put(machine, pillar);
-                    }
+                    List<TaskAssignment> pillar = negativePillarMap.computeIfAbsent(machine,
+                            k -> new ArrayList<>(pillarCapacity));
                     pillar.add(taskAssignment);
                 }
             }
@@ -91,7 +86,7 @@ public class CheapTimePillarSlideMoveIteratorFactory implements MoveIteratorFact
         return new RandomCheapTimePillarSlideMoveIterator(positivePillarList, negativePillarList, workingRandom);
     }
 
-    private class RandomCheapTimePillarSlideMoveIterator implements Iterator<Move> {
+    public static class RandomCheapTimePillarSlideMoveIterator implements Iterator<CheapTimePillarSlideMove> {
 
         private final List<List<TaskAssignment>> positivePillarList;
         private final List<List<TaskAssignment>> negativePillarList;
@@ -112,7 +107,7 @@ public class CheapTimePillarSlideMoveIteratorFactory implements MoveIteratorFact
         }
 
         @Override
-        public Move next() {
+        public CheapTimePillarSlideMove next() {
             int listIndex = workingRandom.nextInt(totalSize);
             boolean positive = listIndex < positivePillarList.size();
             List<TaskAssignment> basePillar = positive ? positivePillarList.get(listIndex)

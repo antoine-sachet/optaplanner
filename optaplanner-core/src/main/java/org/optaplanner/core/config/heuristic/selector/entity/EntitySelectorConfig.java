@@ -23,6 +23,7 @@ import java.util.List;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
 import com.thoughtworks.xstream.annotations.XStreamImplicit;
+import org.optaplanner.core.api.domain.entity.PlanningEntity;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.config.heuristic.policy.HeuristicConfigPolicy;
 import org.optaplanner.core.config.heuristic.selector.SelectorConfig;
@@ -53,6 +54,12 @@ import org.optaplanner.core.impl.heuristic.selector.entity.mimic.MimicReplayingE
 
 @XStreamAlias("entitySelector")
 public class EntitySelectorConfig extends SelectorConfig<EntitySelectorConfig> {
+
+    public static EntitySelectorConfig newMimicSelectorConfig(String mimicSelectorRef) {
+        EntitySelectorConfig entitySelectorConfig = new EntitySelectorConfig();
+        entitySelectorConfig.setMimicSelectorRef(mimicSelectorRef);
+        return entitySelectorConfig;
+    }
 
     @XStreamAsAttribute
     protected String id = null;
@@ -341,7 +348,7 @@ public class EntitySelectorConfig extends SelectorConfig<EntitySelectorConfig> {
 
     private boolean hasFiltering(EntityDescriptor entityDescriptor) {
         return !ConfigUtils.isEmptyCollection(filterClassList)
-                || entityDescriptor.hasMovableEntitySelectionFilter();
+                || entityDescriptor.hasEffectiveMovableEntitySelectionFilter();
     }
 
     private EntitySelector applyFiltering(SelectionCacheType resolvedCacheType, SelectionOrder resolvedSelectionOrder,
@@ -356,8 +363,8 @@ public class EntitySelectorConfig extends SelectorConfig<EntitySelectorConfig> {
                 }
             }
             // Filter out immovable entities
-            if (entityDescriptor.hasMovableEntitySelectionFilter()) {
-                filterList.add(entityDescriptor.getMovableEntitySelectionFilter());
+            if (entityDescriptor.hasEffectiveMovableEntitySelectionFilter()) {
+                filterList.add(entityDescriptor.getEffectiveMovableEntitySelectionFilter());
             }
             // Do not filter out initialized entities here for CH and ES, because they can be partially initialized
             // Instead, ValueSelectorConfig.applyReinitializeVariableFiltering() does that.
@@ -427,10 +434,10 @@ public class EntitySelectorConfig extends SelectorConfig<EntitySelectorConfig> {
             SelectionSorter sorter;
             if (sorterManner != null) {
                 EntityDescriptor entityDescriptor = entitySelector.getEntityDescriptor();
-                if (!sorterManner.hasSorter(entityDescriptor)) {
+                if (!hasSorter(sorterManner, entityDescriptor)) {
                     return entitySelector;
                 }
-                sorter = sorterManner.determineSorter(entityDescriptor);
+                sorter = determineSorter(sorterManner, entityDescriptor);
             } else if (sorterComparatorClass != null) {
                 Comparator<Object> sorterComparator = ConfigUtils.newInstance(this,
                         "sorterComparatorClass", sorterComparatorClass);
@@ -514,7 +521,8 @@ public class EntitySelectorConfig extends SelectorConfig<EntitySelectorConfig> {
             SelectionCacheType resolvedCacheType, SelectionOrder resolvedSelectionOrder,
             EntitySelector entitySelector) {
         if (selectedCountLimit != null) {
-            entitySelector = new SelectedCountLimitEntitySelector(entitySelector, selectedCountLimit);
+            entitySelector = new SelectedCountLimitEntitySelector(entitySelector,
+                    resolvedSelectionOrder.toRandomSelectionBoolean(), selectedCountLimit);
         }
         return entitySelector;
     }
@@ -565,6 +573,41 @@ public class EntitySelectorConfig extends SelectorConfig<EntitySelectorConfig> {
     @Override
     public String toString() {
         return getClass().getSimpleName() + "(" + entityClass + ")";
+    }
+
+    public static boolean hasSorter(EntitySorterManner entitySorterManner, EntityDescriptor entityDescriptor) {
+        switch (entitySorterManner) {
+            case NONE:
+                return false;
+            case DECREASING_DIFFICULTY:
+                return true;
+            case DECREASING_DIFFICULTY_IF_AVAILABLE:
+                return entityDescriptor.getDecreasingDifficultySorter() != null;
+            default:
+                throw new IllegalStateException("The sorterManner ("
+                        + entitySorterManner + ") is not implemented.");
+        }
+    }
+
+    public static SelectionSorter determineSorter(EntitySorterManner entitySorterManner, EntityDescriptor entityDescriptor) {
+        SelectionSorter sorter;
+        switch (entitySorterManner) {
+            case NONE:
+                throw new IllegalStateException("Impossible state: hasSorter() should have returned null.");
+            case DECREASING_DIFFICULTY:
+            case DECREASING_DIFFICULTY_IF_AVAILABLE:
+                sorter = entityDescriptor.getDecreasingDifficultySorter();
+                if (sorter == null) {
+                    throw new IllegalArgumentException("The sorterManner (" + entitySorterManner
+                            + ") on entity class (" + entityDescriptor.getEntityClass()
+                            + ") fails because that entity class's @" + PlanningEntity.class.getSimpleName()
+                            + " annotation does not declare any difficulty comparison.");
+                }
+                return sorter;
+            default:
+                throw new IllegalStateException("The sorterManner ("
+                        + entitySorterManner + ") is not implemented.");
+        }
     }
 
 }

@@ -16,12 +16,9 @@
 
 package org.optaplanner.core.impl.phase.custom;
 
-import java.util.Map;
-
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.api.solver.Solver;
-import org.optaplanner.core.api.solver.SolverFactory;
 import org.optaplanner.core.impl.phase.Phase;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.core.impl.solver.ProblemFactChange;
@@ -32,23 +29,18 @@ import org.optaplanner.core.impl.solver.ProblemFactChange;
  * instead use {@link Solver#addProblemFactChange(ProblemFactChange)} for that.
  * <p>
  * An implementation must extend {@link AbstractCustomPhaseCommand} to ensure backwards compatibility in future versions.
+ * <p>
+ * To add custom properties, configure custom properties and add public setters for them.
  * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
  * @see AbstractCustomPhaseCommand
  */
 public interface CustomPhaseCommand<Solution_> {
 
     /**
-     * Called during {@link SolverFactory#buildSolver()}.
-     * @param customPropertyMap never null
-     * @throws IllegalArgumentException if any of the properties are not supported or don't parse correctly
-     */
-    void applyCustomProperties(Map<String, String> customPropertyMap);
-
-    /**
      * Changes {@link PlanningSolution working solution} of {@link ScoreDirector#getWorkingSolution()}.
      * When the {@link PlanningSolution working solution} is modified, the {@link ScoreDirector} must be correctly notified
-     * (through {@link ScoreDirector#beforeVariableChanged(Object, String)},
-     * {@link ScoreDirector#afterProblemFactChanged(Object)}, etc),
+     * (through {@link ScoreDirector#beforeVariableChanged(Object, String)} and
+     * {@link ScoreDirector#afterVariableChanged(Object, String)}),
      * otherwise calculated {@link Score}s will be corrupted.
      * <p>
      * Don't forget to call {@link ScoreDirector#triggerVariableListeners()} after each set of changes

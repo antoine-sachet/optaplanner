@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plannerBenchmark>
   <benchmarkDirectory>local/data/nqueens/stepLimit</benchmarkDirectory>
+  <warmUpSecondsSpentLimit>0</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -11,7 +12,6 @@
       <solutionClass>org.optaplanner.examples.nqueens.domain.NQueens</solutionClass>
       <entityClass>org.optaplanner.examples.nqueens.domain.Queen</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>SIMPLE</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/nqueens/solver/nQueensScoreRules.drl</scoreDrl>
         <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>
       </scoreDirectorFactory>

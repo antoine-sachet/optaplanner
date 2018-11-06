@@ -17,16 +17,18 @@
 package org.optaplanner.examples.meetingscheduling.app;
 
 import org.optaplanner.examples.common.app.CommonApp;
-import org.optaplanner.examples.common.persistence.SolutionDao;
-import org.optaplanner.examples.common.swingui.SolutionPanel;
 import org.optaplanner.examples.meetingscheduling.domain.MeetingSchedule;
-import org.optaplanner.examples.meetingscheduling.persistence.MeetingSchedulingDao;
+import org.optaplanner.examples.meetingscheduling.persistence.MeetingSchedulingXlsxFileIO;
 import org.optaplanner.examples.meetingscheduling.swingui.MeetingSchedulingPanel;
+import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
+import org.optaplanner.persistence.xstream.impl.domain.solution.XStreamSolutionFileIO;
 
 public class MeetingSchedulingApp extends CommonApp<MeetingSchedule> {
 
     public static final String SOLVER_CONFIG
             = "org/optaplanner/examples/meetingscheduling/solver/meetingSchedulingSolverConfig.xml";
+
+    public static final String DATA_DIR_NAME = "meetingscheduling";
 
     public static void main(String[] args) {
         prepareSwingEnvironment();
@@ -36,18 +38,18 @@ public class MeetingSchedulingApp extends CommonApp<MeetingSchedule> {
     public MeetingSchedulingApp() {
         super("Meeting scheduling",
                 "Assign meetings a starting time and a room.",
-                SOLVER_CONFIG,
+                SOLVER_CONFIG, DATA_DIR_NAME,
                 MeetingSchedulingPanel.LOGO_PATH);
     }
 
     @Override
-    protected SolutionPanel createSolutionPanel() {
+    protected MeetingSchedulingPanel createSolutionPanel() {
         return new MeetingSchedulingPanel();
     }
 
     @Override
-    protected SolutionDao createSolutionDao() {
-        return new MeetingSchedulingDao();
+    public SolutionFileIO<MeetingSchedule> createSolutionFileIO() {
+        return new MeetingSchedulingXlsxFileIO();
     }
 
 }

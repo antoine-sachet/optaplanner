@@ -17,13 +17,13 @@
 package org.optaplanner.benchmark.impl.result;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -57,7 +57,8 @@ public class PlannerBenchmarkResult {
     // If it is an aggregation, many properties can stay null
 
     private Integer availableProcessors = null;
-    private String loggingLevel = null;
+    private String loggingLevelOptaPlannerCore = null;
+    private String loggingLevelDroolsCore = null;
     private Long maxMemory = null;
     private String optaPlannerVersion = null;
     private String javaVersion = null;
@@ -73,7 +74,7 @@ public class PlannerBenchmarkResult {
     @XStreamImplicit(itemFieldName = "unifiedProblemBenchmarkResult")
     private List<ProblemBenchmarkResult> unifiedProblemBenchmarkResultList = null;
 
-    private Date startingTimestamp = null;
+    private OffsetDateTime startingTimestamp = null;
     private Long benchmarkTimeMillisSpent = null;
 
     // ************************************************************************
@@ -84,6 +85,10 @@ public class PlannerBenchmarkResult {
     private Long averageProblemScale = null;
     private Score averageScore = null;
     private SolverBenchmarkResult favoriteSolverBenchmarkResult = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public String getName() {
         return name;
@@ -113,8 +118,12 @@ public class PlannerBenchmarkResult {
         return availableProcessors;
     }
 
-    public String getLoggingLevel() {
-        return loggingLevel;
+    public String getLoggingLevelOptaPlannerCore() {
+        return loggingLevelOptaPlannerCore;
+    }
+
+    public String getLoggingLevelDroolsCore() {
+        return loggingLevelDroolsCore;
     }
 
     public Long getMaxMemory() {
@@ -173,11 +182,11 @@ public class PlannerBenchmarkResult {
         this.unifiedProblemBenchmarkResultList = unifiedProblemBenchmarkResultList;
     }
 
-    public Date getStartingTimestamp() {
+    public OffsetDateTime getStartingTimestamp() {
         return startingTimestamp;
     }
 
-    public void setStartingTimestamp(Date startingTimestamp) {
+    public void setStartingTimestamp(OffsetDateTime startingTimestamp) {
         this.startingTimestamp = startingTimestamp;
     }
 
@@ -228,14 +237,23 @@ public class PlannerBenchmarkResult {
         return maximumSubSingleCount;
     }
 
+    public String findScoreLevelLabel(int scoreLevel) {
+        String[] levelLabels = solverBenchmarkResultList.get(0).getScoreDefinition().getLevelLabels();
+        return levelLabels[scoreLevel];
+    }
+
+    public String getStartingTimestampAsMediumString() {
+        return startingTimestamp == null ? null : startingTimestamp.format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM));
+    }
+
     // ************************************************************************
     // Accumulate methods
     // ************************************************************************
 
     public void initBenchmarkReportDirectory(File benchmarkDirectory) {
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd_HHmmss").format(startingTimestamp);
+        String timestampString = startingTimestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"));
         if (StringUtils.isEmpty(name)) {
-            name = timestamp;
+            name = timestampString;
         }
         if (!benchmarkDirectory.mkdirs()) {
             if (!benchmarkDirectory.isDirectory()) {
@@ -249,7 +267,7 @@ public class PlannerBenchmarkResult {
         }
         int duplicationIndex = 0;
         do {
-            String directoryName = timestamp + (duplicationIndex == 0 ? "" : "_" + duplicationIndex);
+            String directoryName = timestampString + (duplicationIndex == 0 ? "" : "_" + duplicationIndex);
             duplicationIndex++;
             benchmarkReportDirectory = new File(benchmarkDirectory,
                     BooleanUtils.isFalse(aggregation) ? directoryName : directoryName + "_aggregation");
@@ -261,7 +279,8 @@ public class PlannerBenchmarkResult {
 
     public void initSystemProperties() {
         availableProcessors = Runtime.getRuntime().availableProcessors();
-        loggingLevel = resolveLoggingLevel();
+        loggingLevelOptaPlannerCore = resolveLoggingLevel("org.optaplanner.core");
+        loggingLevelDroolsCore = resolveLoggingLevel("org.drools.core");
         maxMemory = Runtime.getRuntime().maxMemory();
         optaPlannerVersion = SolverFactory.class.getPackage().getImplementationVersion();
         if (optaPlannerVersion == null) {
@@ -274,8 +293,8 @@ public class PlannerBenchmarkResult {
                 + " " + System.getProperty("os.version");
     }
 
-    private String resolveLoggingLevel() {
-        Logger logger = LoggerFactory.getLogger("org.optaplanner.core");
+    private String resolveLoggingLevel(String loggerName) {
+        Logger logger = LoggerFactory.getLogger(loggerName);
         if (logger.isTraceEnabled()) {
             return "trace";
         } else if (logger.isDebugEnabled()) {
@@ -287,7 +306,7 @@ public class PlannerBenchmarkResult {
         } else if (logger.isErrorEnabled()) {
             return "error";
         } else {
-            throw new IllegalStateException("Logging level for category (org.optaplanner.core) cannot be determined.");
+            throw new IllegalStateException("Logging level for loggerName (" + loggerName + ") cannot be determined.");
         }
     }
 
@@ -354,12 +373,7 @@ public class PlannerBenchmarkResult {
     private void determineSolverRanking(BenchmarkReport benchmarkReport) {
         List<SolverBenchmarkResult> rankableSolverBenchmarkResultList = new ArrayList<>(solverBenchmarkResultList);
         // Do not rank a SolverBenchmarkResult that has a failure
-        for (Iterator<SolverBenchmarkResult> it = rankableSolverBenchmarkResultList.iterator(); it.hasNext(); ) {
-            SolverBenchmarkResult solverBenchmarkResult = it.next();
-            if (solverBenchmarkResult.hasAnyFailure()) {
-                it.remove();
-            }
-        }
+        rankableSolverBenchmarkResultList.removeIf(SolverBenchmarkResult::hasAnyFailure);
         List<List<SolverBenchmarkResult>> sameRankingListList = createSameRankingListList(
                 benchmarkReport, rankableSolverBenchmarkResultList);
         int ranking = 0;
@@ -380,7 +394,7 @@ public class PlannerBenchmarkResult {
         if (benchmarkReport.getSolverRankingComparator() != null) {
             Comparator<SolverBenchmarkResult> comparator = Collections.reverseOrder(
                     benchmarkReport.getSolverRankingComparator());
-            Collections.sort(rankableSolverBenchmarkResultList, comparator);
+            rankableSolverBenchmarkResultList.sort(comparator);
             List<SolverBenchmarkResult> sameRankingList = null;
             SolverBenchmarkResult previousSolverBenchmarkResult = null;
             for (SolverBenchmarkResult solverBenchmarkResult : rankableSolverBenchmarkResultList) {
@@ -399,11 +413,8 @@ public class PlannerBenchmarkResult {
             for (SolverBenchmarkResult solverBenchmarkResult : rankableSolverBenchmarkResultList) {
                 Comparable rankingWeight = benchmarkReport.getSolverRankingWeightFactory()
                         .createRankingWeight(rankableSolverBenchmarkResultList, solverBenchmarkResult);
-                List<SolverBenchmarkResult> sameRankingList = rankedMap.get(rankingWeight);
-                if (sameRankingList == null) {
-                    sameRankingList = new ArrayList<>();
-                    rankedMap.put(rankingWeight, sameRankingList);
-                }
+                List<SolverBenchmarkResult> sameRankingList = rankedMap.computeIfAbsent(rankingWeight,
+                        k -> new ArrayList<>());
                 sameRankingList.add(solverBenchmarkResult);
             }
             for (Map.Entry<Comparable, List<SolverBenchmarkResult>> entry : rankedMap.entrySet()) {
@@ -420,7 +431,8 @@ public class PlannerBenchmarkResult {
     // Merger methods
     // ************************************************************************
 
-    public static PlannerBenchmarkResult createMergedResult(List<SingleBenchmarkResult> singleBenchmarkResultList) {
+    public static PlannerBenchmarkResult createMergedResult(
+            List<SingleBenchmarkResult> singleBenchmarkResultList) {
         PlannerBenchmarkResult mergedResult = createMergeSingleton(singleBenchmarkResultList);
         Map<SolverBenchmarkResult, SolverBenchmarkResult> solverMergeMap
                 = SolverBenchmarkResult.createMergeMap(mergedResult, singleBenchmarkResultList);
@@ -431,7 +443,8 @@ public class PlannerBenchmarkResult {
                     singleBenchmarkResult.getSolverBenchmarkResult());
             ProblemBenchmarkResult problemBenchmarkResult = problemMergeMap.get(
                     singleBenchmarkResult.getProblemBenchmarkResult());
-            SingleBenchmarkResult.createMerge(solverBenchmarkResult, problemBenchmarkResult, singleBenchmarkResult);
+            SingleBenchmarkResult.createMerge(
+                    solverBenchmarkResult, problemBenchmarkResult, singleBenchmarkResult);
         }
         return mergedResult;
     }
@@ -448,7 +461,8 @@ public class PlannerBenchmarkResult {
                     newResult = new PlannerBenchmarkResult();
                     newResult.setAggregation(true);
                     newResult.availableProcessors = oldResult.availableProcessors;
-                    newResult.loggingLevel = oldResult.loggingLevel;
+                    newResult.loggingLevelOptaPlannerCore = oldResult.loggingLevelOptaPlannerCore;
+                    newResult.loggingLevelDroolsCore = oldResult.loggingLevelDroolsCore;
                     newResult.maxMemory = oldResult.maxMemory;
                     newResult.optaPlannerVersion = oldResult.optaPlannerVersion;
                     newResult.javaVersion = oldResult.javaVersion;
@@ -465,8 +479,10 @@ public class PlannerBenchmarkResult {
                 } else {
                     newResult.availableProcessors = ConfigUtils.mergeProperty(
                             newResult.availableProcessors, oldResult.availableProcessors);
-                    newResult.loggingLevel = ConfigUtils.mergeProperty(
-                            newResult.loggingLevel, oldResult.loggingLevel);
+                    newResult.loggingLevelOptaPlannerCore = ConfigUtils.mergeProperty(
+                            newResult.loggingLevelOptaPlannerCore, oldResult.loggingLevelOptaPlannerCore);
+                    newResult.loggingLevelDroolsCore = ConfigUtils.mergeProperty(
+                            newResult.loggingLevelDroolsCore, oldResult.loggingLevelDroolsCore);
                     newResult.maxMemory = ConfigUtils.mergeProperty(
                             newResult.maxMemory, oldResult.maxMemory);
                     newResult.optaPlannerVersion = ConfigUtils.mergeProperty(
@@ -494,8 +510,8 @@ public class PlannerBenchmarkResult {
     public static PlannerBenchmarkResult createUnmarshallingFailedResult(String benchmarkReportDirectoryName) {
         PlannerBenchmarkResult result = new PlannerBenchmarkResult();
         result.setName("Failed unmarshalling " + benchmarkReportDirectoryName);
-        result.setSolverBenchmarkResultList(Collections.<SolverBenchmarkResult>emptyList());
-        result.setUnifiedProblemBenchmarkResultList(Collections.<ProblemBenchmarkResult>emptyList());
+        result.setSolverBenchmarkResultList(Collections.emptyList());
+        result.setUnifiedProblemBenchmarkResultList(Collections.emptyList());
         return result;
     }
 

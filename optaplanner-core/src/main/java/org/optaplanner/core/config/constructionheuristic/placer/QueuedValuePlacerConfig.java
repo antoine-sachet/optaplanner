@@ -43,12 +43,20 @@ import org.optaplanner.core.impl.solver.termination.Termination;
 @XStreamAlias("queuedValuePlacer")
 public class QueuedValuePlacerConfig extends EntityPlacerConfig<QueuedValuePlacerConfig> {
 
+    public static QueuedValuePlacerConfig unfoldNew(HeuristicConfigPolicy configPolicy, MoveSelectorConfig templateMoveSelectorConfig) {
+        throw new UnsupportedOperationException("The <constructionHeuristic> contains a moveSelector ("
+                + templateMoveSelectorConfig + ") and the <queuedValuePlacer> does not support unfolding those yet.");
+    }
+
     protected Class<?> entityClass = null;
     @XStreamAlias("valueSelector")
     protected ValueSelectorConfig valueSelectorConfig = null;
     // TODO This is a List due to XStream limitations. With JAXB it could be just a MoveSelectorConfig instead.
     @XStreamImplicit()
     private List<MoveSelectorConfig> moveSelectorConfigList = null;
+
+    public QueuedValuePlacerConfig() {
+    }
 
     public Class<?> getEntityClass() {
         return entityClass;
@@ -79,7 +87,7 @@ public class QueuedValuePlacerConfig extends EntityPlacerConfig<QueuedValuePlace
     // ************************************************************************
 
     @Override
-    public QueuedValuePlacer buildEntityPlacer(HeuristicConfigPolicy configPolicy, Termination phaseTermination) {
+    public QueuedValuePlacer buildEntityPlacer(HeuristicConfigPolicy configPolicy) {
         EntityDescriptor entityDescriptor = deduceEntityDescriptor(configPolicy.getSolutionDescriptor(), entityClass);
         boolean reinitializeVariableFilterEnabled = configPolicy.isReinitializeVariableFilterEnabled();
         configPolicy.setReinitializeVariableFilterEnabled(false);
@@ -97,8 +105,8 @@ public class QueuedValuePlacerConfig extends EntityPlacerConfig<QueuedValuePlace
         } else {
             // TODO moveSelectorConfigList is only a List because of XStream limitations.
             throw new IllegalArgumentException("The moveSelectorConfigList (" + moveSelectorConfigList
-                    + ") must be a singleton or empty. Use a single " + UnionMoveSelectorConfig.class
-                    + " or " + CartesianProductMoveSelectorConfig.class
+                    + ") must be a singleton or empty. Use a single " + UnionMoveSelectorConfig.class.getSimpleName()
+                    + " or " + CartesianProductMoveSelectorConfig.class.getSimpleName()
                     + " element to nest multiple MoveSelectors.");
         }
         MoveSelector moveSelector = moveSelectorConfig.buildMoveSelector(
@@ -121,7 +129,7 @@ public class QueuedValuePlacerConfig extends EntityPlacerConfig<QueuedValuePlace
             GenuineVariableDescriptor variableDescriptor = deduceVariableDescriptor(entityDescriptor, null);
             valueSelectorConfig_.setId(entityClass.getName() + "." + variableDescriptor.getVariableName());
             valueSelectorConfig_.setVariableName(variableDescriptor.getVariableName());
-            if (configPolicy.getValueSorterManner().hasSorter(variableDescriptor)) {
+            if (ValueSelectorConfig.hasSorter(configPolicy.getValueSorterManner(), variableDescriptor)) {
                 valueSelectorConfig_.setCacheType(SelectionCacheType.PHASE);
                 valueSelectorConfig_.setSelectionOrder(SelectionOrder.SORTED);
                 valueSelectorConfig_.setSorterManner(configPolicy.getValueSorterManner());
@@ -145,7 +153,7 @@ public class QueuedValuePlacerConfig extends EntityPlacerConfig<QueuedValuePlace
         EntitySelectorConfig changeEntitySelectorConfig = new EntitySelectorConfig();
         EntityDescriptor entityDescriptor = variableDescriptor.getEntityDescriptor();
         changeEntitySelectorConfig.setEntityClass(entityDescriptor.getEntityClass());
-        if (configPolicy.getEntitySorterManner().hasSorter(entityDescriptor)) {
+        if (EntitySelectorConfig.hasSorter(configPolicy.getEntitySorterManner(), entityDescriptor)) {
             changeEntitySelectorConfig.setCacheType(SelectionCacheType.PHASE);
             changeEntitySelectorConfig.setSelectionOrder(SelectionOrder.SORTED);
             changeEntitySelectorConfig.setSorterManner(configPolicy.getEntitySorterManner());

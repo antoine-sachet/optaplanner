@@ -32,7 +32,7 @@ import org.optaplanner.examples.vehiclerouting.domain.timewindowed.TimeWindowedV
 public class VehicleRoutingEasyScoreCalculator implements EasyScoreCalculator<VehicleRoutingSolution> {
 
     @Override
-    public HardSoftLongScore calculateScore(VehicleRoutingSolution solution, int initScore) {
+    public HardSoftLongScore calculateScore(VehicleRoutingSolution solution) {
         boolean timeWindowed = solution instanceof TimeWindowedVehicleRoutingSolution;
         List<Customer> customerList = solution.getCustomerList();
         List<Vehicle> vehicleList = solution.getVehicleList();
@@ -72,8 +72,8 @@ public class VehicleRoutingEasyScoreCalculator implements EasyScoreCalculator<Ve
                 hardScore -= (demand - capacity);
             }
         }
-        // Score constraint arrivalAfterDueTimeAtDepot is a build-in hard constraint in VehicleRoutingImporter
-        return HardSoftLongScore.valueOf(initScore, hardScore, softScore);
+        // Score constraint arrivalAfterDueTimeAtDepot is a built-in hard constraint in VehicleRoutingImporter
+        return HardSoftLongScore.of(hardScore, softScore);
     }
 
 }

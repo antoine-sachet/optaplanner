@@ -34,7 +34,6 @@ public abstract class AbstractScoreDirectorFactory<Solution_> implements InnerSc
     protected final transient Logger logger = LoggerFactory.getLogger(getClass());
 
     protected SolutionDescriptor<Solution_> solutionDescriptor;
-    protected ScoreDefinition scoreDefinition;
 
     protected InitializingScoreTrend initializingScoreTrend;
 
@@ -42,22 +41,18 @@ public abstract class AbstractScoreDirectorFactory<Solution_> implements InnerSc
 
     protected boolean assertClonedSolution = false;
 
+    public AbstractScoreDirectorFactory(SolutionDescriptor<Solution_> solutionDescriptor) {
+        this.solutionDescriptor = solutionDescriptor;
+    }
+
     @Override
     public SolutionDescriptor<Solution_> getSolutionDescriptor() {
         return solutionDescriptor;
     }
 
-    public void setSolutionDescriptor(SolutionDescriptor<Solution_> solutionDescriptor) {
-        this.solutionDescriptor = solutionDescriptor;
-    }
-
     @Override
     public ScoreDefinition getScoreDefinition() {
-        return scoreDefinition;
-    }
-
-    public void setScoreDefinition(ScoreDefinition scoreDefinition) {
-        this.scoreDefinition = scoreDefinition;
+        return solutionDescriptor.getScoreDefinition();
     }
 
     @Override
@@ -91,21 +86,22 @@ public abstract class AbstractScoreDirectorFactory<Solution_> implements InnerSc
 
     @Override
     public InnerScoreDirector<Solution_> buildScoreDirector() {
-        return buildScoreDirector(true);
+        return buildScoreDirector(true, true);
     }
 
     @Override
     public void assertScoreFromScratch(Solution_ solution) {
         // Get the score before uncorruptedScoreDirector.calculateScore() modifies it
         Score score = getSolutionDescriptor().getScore(solution);
-        InnerScoreDirector<Solution_> uncorruptedScoreDirector = buildScoreDirector(true);
-        uncorruptedScoreDirector.setWorkingSolution(solution);
-        Score uncorruptedScore = uncorruptedScoreDirector.calculateScore();
-        uncorruptedScoreDirector.dispose();
-        if (!score.equals(uncorruptedScore)) {
-            throw new IllegalStateException(
-                    "Score corruption: the solution's score (" + score + ") is not the uncorruptedScore ("
-                            + uncorruptedScore + ").");
+        try (InnerScoreDirector<Solution_> uncorruptedScoreDirector = buildScoreDirector(false, true)) {
+            uncorruptedScoreDirector.setWorkingSolution(solution);
+            Score uncorruptedScore = uncorruptedScoreDirector.calculateScore();
+            if (!score.equals(uncorruptedScore)) {
+                throw new IllegalStateException(
+                        "Score corruption (" + score.subtract(uncorruptedScore).toShortString()
+                                + "): the solution's score (" + score + ") is not the uncorruptedScore ("
+                                + uncorruptedScore + ").");
+            }
         }
     }
 

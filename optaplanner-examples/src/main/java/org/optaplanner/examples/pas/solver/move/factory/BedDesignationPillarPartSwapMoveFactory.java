@@ -38,18 +38,14 @@ import org.optaplanner.examples.pas.solver.move.BedChangeMove;
 public class BedDesignationPillarPartSwapMoveFactory implements MoveListFactory<PatientAdmissionSchedule> {
 
     @Override
-    public List<Move> createMoveList(PatientAdmissionSchedule patientAdmissionSchedule) {
+    public List<Move<PatientAdmissionSchedule>> createMoveList(PatientAdmissionSchedule patientAdmissionSchedule) {
         Map<Bed, List<BedDesignation>> bedToBedDesignationList = new HashMap<>(
                 patientAdmissionSchedule.getBedList().size());
         for (BedDesignation bedDesignation : patientAdmissionSchedule.getBedDesignationList()) {
-            List<BedDesignation> bedDesignationListPerBed = bedToBedDesignationList.get(bedDesignation.getBed());
-            if (bedDesignationListPerBed == null) {
-                // Note: the initialCapacity is probably to high,
-                // which is bad for memory, but the opposite is bad for performance (which is worse)
-                bedDesignationListPerBed = new ArrayList<>(
-                        patientAdmissionSchedule.getNightList().size());
-                bedToBedDesignationList.put(bedDesignation.getBed(), bedDesignationListPerBed);
-            }
+            List<BedDesignation> bedDesignationListPerBed = bedToBedDesignationList.computeIfAbsent(bedDesignation.getBed(),
+                    // Note: the initialCapacity is probably too high,
+                    // which is bad for memory, but the opposite is bad for performance (which is worse)
+                    k -> new ArrayList<>(patientAdmissionSchedule.getNightList().size()));
             bedDesignationListPerBed.add(bedDesignation);
         }
         for (List<BedDesignation> bedDesignationListPerBed : bedToBedDesignationList.values()) {
@@ -67,7 +63,7 @@ public class BedDesignationPillarPartSwapMoveFactory implements MoveListFactory<
         }
 
         List<Bed> bedList = patientAdmissionSchedule.getBedList();
-        List<Move> moveList = new ArrayList<>();
+        List<Move<PatientAdmissionSchedule>> moveList = new ArrayList<>();
 
         // For every 2 distinct beds
         for (ListIterator<Bed> leftBedIt = bedList.listIterator(); leftBedIt.hasNext();) {
@@ -88,9 +84,9 @@ public class BedDesignationPillarPartSwapMoveFactory implements MoveListFactory<
                 // For every pillar part duo
                 while (lowestIt.hasNext()) {
                     BedDesignation pillarPartBedDesignation = lowestIt.next();
-                    // Note: the initialCapacity is probably to high,
+                    // Note: the initialCapacity is probably too high,
                     // which is bad for memory, but the opposite is bad for performance (which is worse)
-                    List<Move> moveListByPillarPartDuo = new ArrayList<>(
+                    List<BedChangeMove> moveListByPillarPartDuo = new ArrayList<>(
                             leftBedDesignationList.size() + rightBedDesignationList.size());
                     int lastNightIndex = pillarPartBedDesignation.getAdmissionPart().getLastNight().getIndex();
                     Bed otherBed;

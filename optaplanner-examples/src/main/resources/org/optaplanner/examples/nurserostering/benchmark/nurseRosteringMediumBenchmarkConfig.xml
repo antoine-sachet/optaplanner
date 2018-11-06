@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/nurserostering/medium</benchmarkDirectory>
   <parallelBenchmarkCount>AUTO</parallelBenchmarkCount>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -20,7 +19,7 @@
       <inputSolutionFile>data/nurserostering/unsolved/medium_late03.xml</inputSolutionFile>
       <inputSolutionFile>data/nurserostering/unsolved/medium_late04.xml</inputSolutionFile>
       <inputSolutionFile>data/nurserostering/unsolved/medium_late05.xml</inputSolutionFile>
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
+      <!--<problemStatisticType>BEST_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>STEP_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>SCORE_CALCULATION_SPEED</problemStatisticType>-->
       <!--<problemStatisticType>BEST_SOLUTION_MUTATION</problemStatisticType>-->
@@ -36,7 +35,6 @@
       <solutionClass>org.optaplanner.examples.nurserostering.domain.NurseRoster</solutionClass>
       <entityClass>org.optaplanner.examples.nurserostering.domain.ShiftAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/nurserostering/solver/nurseRosteringScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <termination>

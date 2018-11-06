@@ -19,11 +19,19 @@ package org.optaplanner.benchmark.api;
 import java.io.File;
 import java.io.InputStream;
 import java.io.Reader;
+import java.util.Collections;
+import java.util.List;
 
 import org.optaplanner.benchmark.config.PlannerBenchmarkConfig;
+import org.optaplanner.benchmark.config.SolverBenchmarkConfig;
+import org.optaplanner.benchmark.impl.EmptyPlannerBenchmarkFactory;
 import org.optaplanner.benchmark.impl.FreemarkerXmlPlannerBenchmarkFactory;
 import org.optaplanner.benchmark.impl.XStreamXmlPlannerBenchmarkFactory;
+import org.optaplanner.core.api.domain.solution.PlanningSolution;
+import org.optaplanner.core.api.solver.SolverFactory;
 import org.optaplanner.core.config.SolverConfigContext;
+import org.optaplanner.core.config.solver.SolverConfig;
+import org.optaplanner.core.impl.solver.AbstractSolverFactory;
 
 /**
  * Builds {@link PlannerBenchmark} instances.
@@ -35,6 +43,34 @@ public abstract class PlannerBenchmarkFactory {
     // ************************************************************************
     // Static creation methods
     // ************************************************************************
+
+    /**
+     * @param solverFactory never null, also its {@link ClassLoader} is reused if any was configured during creation
+     * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
+     */
+    public static <Solution_> PlannerBenchmarkFactory createFromSolverFactory(SolverFactory<Solution_> solverFactory) {
+        return createFromSolverFactory(solverFactory, new File("local/benchmarkReport"));
+    }
+
+    /**
+     * @param solverFactory never null, also its {@link ClassLoader} is reused if any was configured during creation
+     * @param benchmarkDirectory never null
+     * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
+     */
+    public static <Solution_> PlannerBenchmarkFactory createFromSolverFactory(SolverFactory<Solution_> solverFactory,
+            File benchmarkDirectory) {
+        SolverConfigContext solverConfigContext = ((AbstractSolverFactory) solverFactory).getSolverConfigContext();
+        PlannerBenchmarkFactory plannerBenchmarkFactory = (solverConfigContext == null)
+                ? new EmptyPlannerBenchmarkFactory() : new EmptyPlannerBenchmarkFactory(solverConfigContext);
+        PlannerBenchmarkConfig plannerBenchmarkConfig = plannerBenchmarkFactory.getPlannerBenchmarkConfig();
+        plannerBenchmarkConfig.setBenchmarkDirectory(benchmarkDirectory);
+        SolverBenchmarkConfig solverBenchmarkConfig = new SolverBenchmarkConfig();
+        SolverConfig solverConfig = new SolverConfig(solverFactory.getSolverConfig());
+        solverBenchmarkConfig.setSolverConfig(solverConfig);
+        plannerBenchmarkConfig.setInheritedSolverBenchmarkConfig(solverBenchmarkConfig);
+        plannerBenchmarkConfig.setSolverBenchmarkConfigList(Collections.singletonList(new SolverBenchmarkConfig()));
+        return plannerBenchmarkFactory;
+    }
 
     /**
      * @param benchmarkConfigResource never null, a classpath resource
@@ -288,7 +324,7 @@ public abstract class PlannerBenchmarkFactory {
     // ************************************************************************
 
     /**
-     * Allows you to problematically change the {@link PlannerBenchmarkConfig} at runtime before building
+     * Allows you to programmatically change the {@link PlannerBenchmarkConfig} at runtime before building
      * the {@link PlannerBenchmark}.
      * <p>
      * This method is not thread-safe.
@@ -301,5 +337,21 @@ public abstract class PlannerBenchmarkFactory {
      * @return never null
      */
     public abstract PlannerBenchmark buildPlannerBenchmark();
+
+    /**
+     * Creates a new {@link PlannerBenchmark} instance for datasets that are already in memory.
+     * @param problems never null, can be none
+     * @return never null
+     * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
+     */
+    public abstract <Solution_> PlannerBenchmark buildPlannerBenchmark(Solution_... problems);
+
+    /**
+     * Creates a new {@link PlannerBenchmark} instance for datasets that are already in memory.
+     * @param problemList never null, can be empty
+     * @return never null
+     * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
+     */
+    public abstract <Solution_> PlannerBenchmark buildPlannerBenchmark(List<Solution_> problemList);
 
 }

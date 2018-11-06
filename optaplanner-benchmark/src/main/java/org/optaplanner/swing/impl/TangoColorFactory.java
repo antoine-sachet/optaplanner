@@ -36,6 +36,7 @@ public class TangoColorFactory {
     public static final Color CHOCOLATE_1 = new Color(233, 185, 110);
     public static final Color CHOCOLATE_2 = new Color(193, 125, 17);
     public static final Color CHOCOLATE_3 = new Color(143, 89, 2);
+    public static final Color MAGENTA = new Color(255, 0, 255);
     public static final Color PLUM_1 = new Color(173, 127, 168);
     public static final Color PLUM_2 = new Color(117, 80, 123);
     public static final Color PLUM_3 = new Color(92, 53, 102);
@@ -80,6 +81,13 @@ public class TangoColorFactory {
     public static final Stroke LIGHT_DASHED_STROKE = new BasicStroke(
             1.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 1.0f, new float[] {3.0f, 7.0f}, 0.0f);
 
+    public static Color buildPercentageColor(Color floorColor, Color ceilColor, double shadePercentage) {
+        return new Color(
+                floorColor.getRed() + (int) (shadePercentage * (ceilColor.getRed() - floorColor.getRed())),
+                floorColor.getGreen() + (int) (shadePercentage * (ceilColor.getGreen() - floorColor.getGreen())),
+                floorColor.getBlue() + (int) (shadePercentage * (ceilColor.getBlue() - floorColor.getBlue())));
+    }
+
     private Map<Object, Color> colorMap;
     private int nextColorCount;
 
@@ -88,13 +96,8 @@ public class TangoColorFactory {
         nextColorCount = 0;
     }
 
-    public Color pickColor(Object o) {
-        Color color = colorMap.get(o);
-        if (color == null) {
-            color = nextColor();
-            colorMap.put(o, color);
-        }
-        return color;
+    public Color pickColor(Object object) {
+        return colorMap.computeIfAbsent(object, k -> nextColor());
     }
 
     private Color nextColor() {
@@ -104,7 +107,7 @@ public class TangoColorFactory {
         if (shadeIndex == 0) {
             color = SEQUENCE_1[colorIndex];
         } else if (shadeIndex == 1) {
-            color = SEQUENCE_2[colorIndex]; // TODO
+            color = SEQUENCE_2[colorIndex];
         } else if (shadeIndex == 2) {
             color = SEQUENCE_3[colorIndex];
         } else {
@@ -125,10 +128,7 @@ public class TangoColorFactory {
             }
             base = (base * 2) - divisor + 1;
             double shadePercentage = ((double) base) / (double) divisor;
-            color = new Color(
-                    floorColor.getRed() + (int) (shadePercentage * (ceilColor.getRed() - floorColor.getRed())),
-                    floorColor.getGreen() + (int) (shadePercentage * (ceilColor.getGreen() - floorColor.getGreen())),
-                    floorColor.getBlue() + (int) (shadePercentage * (ceilColor.getBlue() - floorColor.getBlue())));
+            color = buildPercentageColor(floorColor, ceilColor, shadePercentage);
         }
         nextColorCount++;
         return color;

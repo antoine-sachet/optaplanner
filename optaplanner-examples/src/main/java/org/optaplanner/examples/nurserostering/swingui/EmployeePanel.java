@@ -21,7 +21,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,7 +54,6 @@ public class EmployeePanel extends JPanel {
     private List<Shift> shiftList;
     private Employee employee;
 
-    private JLabel employeeLabel;
     private JButton deleteButton;
     private JPanel shiftDateListPanel = null;
     private Map<ShiftDate, JPanel> shiftDatePanelMap;
@@ -98,19 +96,14 @@ public class EmployeePanel extends JPanel {
         if (employee != null) {
             labelAndDeletePanel.add(new JLabel(nurseRosteringPanel.getEmployeeIcon()), BorderLayout.WEST);
         }
-        employeeLabel = new JLabel(getEmployeeLabel());
+        JLabel employeeLabel = new JLabel(getEmployeeLabel());
         employeeLabel.setEnabled(false);
         labelAndDeletePanel.add(employeeLabel, BorderLayout.CENTER);
         if (employee != null) {
             JPanel deletePanel = new JPanel(new BorderLayout());
             deleteButton = SwingUtils.makeSmallButton(new JButton(nurseRosteringPanel.getDeleteEmployeeIcon()));
             deleteButton.setToolTipText("Delete");
-            deleteButton.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    nurseRosteringPanel.deleteEmployee(employee);
-                }
-            });
+            deleteButton.addActionListener(e -> nurseRosteringPanel.deleteEmployee(employee));
             deletePanel.add(deleteButton, BorderLayout.NORTH);
             labelAndDeletePanel.add(deletePanel, BorderLayout.EAST);
         }
@@ -198,8 +191,10 @@ public class EmployeePanel extends JPanel {
                 shiftAssignmentButton.setForeground(TangoColorFactory.SCARLET_1);
             }
         }
-        int colorIndex = shift.getShiftType().getIndex() % TangoColorFactory.SEQUENCE_1.length;
-        shiftAssignmentButton.setBackground(TangoColorFactory.SEQUENCE_1[colorIndex]);
+        Color color = nurseRosteringPanel.determinePlanningEntityColor(shiftAssignment, shift.getShiftType());
+        shiftAssignmentButton.setBackground(color);
+        String toolTip = nurseRosteringPanel.determinePlanningEntityTooltip(shiftAssignment);
+        shiftAssignmentButton.setToolTipText(toolTip);
         shiftPanel.add(shiftAssignmentButton);
         shiftPanel.repaint();
         shiftAssignmentButtonMap.put(shiftAssignment, shiftAssignmentButton);

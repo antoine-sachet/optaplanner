@@ -19,6 +19,7 @@ package org.optaplanner.benchmark.impl;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -28,7 +29,6 @@ import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.converters.ConversionException;
 import com.thoughtworks.xstream.converters.extended.FileConverter;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.optaplanner.benchmark.api.PlannerBenchmark;
 import org.optaplanner.benchmark.api.PlannerBenchmarkFactory;
 import org.optaplanner.benchmark.config.PlannerBenchmarkConfig;
@@ -38,11 +38,9 @@ import org.optaplanner.core.impl.solver.XStreamXmlSolverFactory;
 /**
  * @see PlannerBenchmarkFactory
  */
-public class XStreamXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactory {
+public class XStreamXmlPlannerBenchmarkFactory extends AbstractPlannerBenchmarkFactory {
 
-    protected final SolverConfigContext solverConfigContext;
     protected XStream xStream;
-    protected PlannerBenchmarkConfig plannerBenchmarkConfig = null;
 
     public XStreamXmlPlannerBenchmarkFactory() {
         this(new SolverConfigContext());
@@ -52,7 +50,7 @@ public class XStreamXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactory {
      * @param solverConfigContext never null
      */
     public XStreamXmlPlannerBenchmarkFactory(SolverConfigContext solverConfigContext) {
-        this.solverConfigContext = solverConfigContext;
+        super(solverConfigContext);
         xStream = XStreamXmlSolverFactory.buildXStream();
         ClassLoader actualClassLoader = solverConfigContext.determineActualClassLoader();
         xStream.setClassLoader(actualClassLoader);
@@ -60,6 +58,7 @@ public class XStreamXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactory {
         xStream.registerConverter(new FileConverter() {
             @Override
             public String toString(Object obj) {
+                // Write "/" path separators (even on Windows) for portability
                 return FilenameUtils.separatorsToUnix(((File) obj).getPath());
             }
         });
@@ -75,6 +74,7 @@ public class XStreamXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactory {
      */
     public void addXStreamAnnotations(Class... xStreamAnnotations) {
         xStream.processAnnotations(xStreamAnnotations);
+        xStream.allowTypes(xStreamAnnotations);
     }
 
     public XStream getXStream() {
@@ -88,72 +88,50 @@ public class XStreamXmlPlannerBenchmarkFactory extends PlannerBenchmarkFactory {
      */
     public XStreamXmlPlannerBenchmarkFactory configure(String benchmarkConfigResource) {
         ClassLoader actualClassLoader = solverConfigContext.determineActualClassLoader();
-        InputStream in = actualClassLoader.getResourceAsStream(benchmarkConfigResource);
-        if (in == null) {
-            String errorMessage = "The benchmarkConfigResource (" + benchmarkConfigResource
-                    + ") does not exist as a classpath resource in the classLoader (" + actualClassLoader + ").";
-            if (benchmarkConfigResource.startsWith("/")) {
-                errorMessage += "\nAs from 6.1, a classpath resource should not start with a slash (/)."
-                        + " A benchmarkConfigResource now adheres to ClassLoader.getResource(String)."
-                        + " Remove the leading slash from the benchmarkConfigResource if you're upgrading from 6.0.";
+        try (InputStream in = actualClassLoader.getResourceAsStream(benchmarkConfigResource)) {
+            if (in == null) {
+                String errorMessage = "The benchmarkConfigResource (" + benchmarkConfigResource
+                        + ") does not exist as a classpath resource in the classLoader (" + actualClassLoader + ").";
+                if (benchmarkConfigResource.startsWith("/")) {
+                    errorMessage += "\nAs from 6.1, a classpath resource should not start with a slash (/)."
+                            + " A benchmarkConfigResource now adheres to ClassLoader.getResource(String)."
+                            + " Remove the leading slash from the benchmarkConfigResource if you're upgrading from 6.0.";
+                }
+                throw new IllegalArgumentException(errorMessage);
             }
-            throw new IllegalArgumentException(errorMessage);
-        }
-        try {
             return configure(in);
         } catch (ConversionException e) {
             throw new IllegalArgumentException("Unmarshalling of benchmarkConfigResource (" + benchmarkConfigResource
                     + ") fails.", e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading the benchmarkConfigResource (" + benchmarkConfigResource + ") failed.", e);
         }
     }
 
     public XStreamXmlPlannerBenchmarkFactory configure(File benchmarkConfigFile) {
-        try {
-            return configure(new FileInputStream(benchmarkConfigFile));
+        try (InputStream in = new FileInputStream(benchmarkConfigFile)) {
+            return configure(in);
         } catch (FileNotFoundException e) {
             throw new IllegalArgumentException("The benchmarkConfigFile (" + benchmarkConfigFile
                     + ") was not found.", e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading the benchmarkConfigFile (" + benchmarkConfigFile + ") failed.", e);
         }
     }
 
     public XStreamXmlPlannerBenchmarkFactory configure(InputStream in) {
-        Reader reader = null;
-        try {
-            reader = new InputStreamReader(in, "UTF-8");
+        try (Reader reader = new InputStreamReader(in, "UTF-8")) {
             return configure(reader);
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException("This vm does not support UTF-8 encoding.", e);
-        } finally {
-            IOUtils.closeQuietly(reader);
-            IOUtils.closeQuietly(in);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Reading failed.", e);
         }
     }
 
     public XStreamXmlPlannerBenchmarkFactory configure(Reader reader) {
         plannerBenchmarkConfig = (PlannerBenchmarkConfig) xStream.fromXML(reader);
         return this;
-    }
-
-    // ************************************************************************
-    // Worker methods
-    // ************************************************************************
-
-    @Override
-    public PlannerBenchmarkConfig getPlannerBenchmarkConfig() {
-        if (plannerBenchmarkConfig == null) {
-            throw new IllegalStateException("The plannerBenchmarkConfig (" + plannerBenchmarkConfig + ") is null," +
-                    " call configure(...) first.");
-        }
-        return plannerBenchmarkConfig;
-    }
-
-    @Override
-    public PlannerBenchmark buildPlannerBenchmark() {
-        if (plannerBenchmarkConfig == null) {
-            throw new IllegalStateException("The plannerBenchmarkConfig (" + plannerBenchmarkConfig + ") is null," +
-                    " call configure(...) first.");
-        }
-        return plannerBenchmarkConfig.buildPlannerBenchmark(solverConfigContext);
     }
 
 }

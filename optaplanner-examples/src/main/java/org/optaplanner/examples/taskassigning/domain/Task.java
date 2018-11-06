@@ -16,20 +16,20 @@
 
 package org.optaplanner.examples.taskassigning.domain;
 
-import javax.swing.Icon;
-
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import org.optaplanner.core.api.domain.entity.PlanningEntity;
+import org.optaplanner.core.api.domain.entity.PlanningPin;
 import org.optaplanner.core.api.domain.variable.AnchorShadowVariable;
 import org.optaplanner.core.api.domain.variable.CustomShadowVariable;
 import org.optaplanner.core.api.domain.variable.PlanningVariable;
 import org.optaplanner.core.api.domain.variable.PlanningVariableGraphType;
+import org.optaplanner.core.api.domain.variable.PlanningVariableReference;
 import org.optaplanner.examples.common.swingui.components.Labeled;
-import org.optaplanner.examples.taskassigning.domain.solver.MovableTaskSelectionFilter;
 import org.optaplanner.examples.taskassigning.domain.solver.StartTimeUpdatingVariableListener;
+import org.optaplanner.examples.taskassigning.domain.solver.TaskDifficultyComparator;
 
-@PlanningEntity(movableEntitySelectionFilter = MovableTaskSelectionFilter.class)
-@XStreamAlias("MsTask")
+@PlanningEntity(difficultyComparatorClass = TaskDifficultyComparator.class)
+@XStreamAlias("TaTask")
 public class Task extends TaskOrEmployee implements Labeled {
 
     private TaskType taskType;
@@ -37,7 +37,8 @@ public class Task extends TaskOrEmployee implements Labeled {
     private Customer customer;
     private int readyTime;
     private Priority priority;
-    private boolean locked;
+    @PlanningPin
+    private boolean pinned;
 
     // Planning variables: changes during planning, between score calculations.
     @PlanningVariable(valueRangeProviderRefs = {"employeeRange", "taskRange"},
@@ -51,8 +52,21 @@ public class Task extends TaskOrEmployee implements Labeled {
     @CustomShadowVariable(variableListenerClass = StartTimeUpdatingVariableListener.class,
             // Arguable, to adhere to API specs (although this works), nextTask and employee should also be a source,
             // because this shadow must be triggered after nextTask and employee (but there is no need to be triggered by those)
-            sources = {@CustomShadowVariable.Source(variableName = "previousTaskOrEmployee")})
+            sources = {@PlanningVariableReference(variableName = "previousTaskOrEmployee")})
     private Integer startTime; // In minutes
+
+    public Task() {
+    }
+
+    public Task(long id, TaskType taskType, int indexInTaskType, Customer customer, int readyTime, Priority priority) {
+        super(id);
+        this.taskType = taskType;
+        this.indexInTaskType = indexInTaskType;
+        this.customer = customer;
+        this.readyTime = readyTime;
+        this.priority = priority;
+        pinned = false;
+    }
 
     public TaskType getTaskType() {
         return taskType;
@@ -94,12 +108,12 @@ public class Task extends TaskOrEmployee implements Labeled {
         this.priority = priority;
     }
 
-    public boolean isLocked() {
-        return locked;
+    public boolean isPinned() {
+        return pinned;
     }
 
-    public void setLocked(boolean locked) {
-        this.locked = locked;
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
     }
 
     public TaskOrEmployee getPreviousTaskOrEmployee() {
@@ -144,6 +158,10 @@ public class Task extends TaskOrEmployee implements Labeled {
         return count;
     }
 
+    /**
+     * In minutes
+     * @return at least 1 minute
+     */
     public int getDuration() {
         Affinity affinity = getAffinity();
         return taskType.getBaseDuration() * affinity.getDurationMultiplier();
@@ -169,6 +187,7 @@ public class Task extends TaskOrEmployee implements Labeled {
         return taskType.getTitle();
     }
 
+    @Override
     public String getLabel() {
         return getCode() + ": " + taskType.getTitle();
     }

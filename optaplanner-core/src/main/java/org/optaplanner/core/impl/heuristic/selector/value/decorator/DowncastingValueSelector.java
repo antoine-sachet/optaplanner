@@ -16,9 +16,9 @@
 
 package org.optaplanner.core.impl.heuristic.selector.value.decorator;
 
+import java.util.Collections;
 import java.util.Iterator;
 
-import com.google.common.collect.Iterators;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
 import org.optaplanner.core.impl.heuristic.selector.value.AbstractValueSelector;
 import org.optaplanner.core.impl.heuristic.selector.value.ValueSelector;
@@ -68,7 +68,7 @@ public class DowncastingValueSelector extends AbstractValueSelector {
     @Override
     public Iterator<Object> iterator(Object entity) {
         if (!downcastEntityClass.isInstance(entity)) {
-            return Iterators.emptyIterator();
+            return Collections.emptyIterator();
         }
         return childValueSelector.iterator(entity);
     }
@@ -76,7 +76,7 @@ public class DowncastingValueSelector extends AbstractValueSelector {
     @Override
     public Iterator<Object> endingIterator(Object entity) {
         if (!downcastEntityClass.isInstance(entity)) {
-            return Iterators.emptyIterator();
+            return Collections.emptyIterator();
         }
         return childValueSelector.endingIterator(entity);
     }

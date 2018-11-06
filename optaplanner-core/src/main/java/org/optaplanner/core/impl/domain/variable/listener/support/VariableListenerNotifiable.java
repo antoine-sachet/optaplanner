@@ -16,7 +16,8 @@
 
 package org.optaplanner.core.impl.domain.variable.listener.support;
 
-import java.util.Set;
+import java.util.ArrayDeque;
+import java.util.Collection;
 
 import org.optaplanner.core.impl.domain.variable.listener.VariableListener;
 
@@ -25,12 +26,16 @@ public class VariableListenerNotifiable implements Comparable<VariableListenerNo
     protected final VariableListener variableListener;
     protected final int globalOrder;
 
-    protected final Set<VariableListenerNotification> notificationQueue;
+    protected final Collection<VariableListenerNotification> notificationQueue;
 
     public VariableListenerNotifiable(VariableListener variableListener, int globalOrder) {
         this.variableListener = variableListener;
         this.globalOrder = globalOrder;
-        notificationQueue = new SmallScalingOrderedSet<>();
+        if (variableListener.requiresUniqueEntityEvents()) {
+            notificationQueue = new SmallScalingOrderedSet<>();
+        } else {
+            notificationQueue = new ArrayDeque<>();
+        }
     }
 
     public VariableListener getVariableListener() {
@@ -41,7 +46,7 @@ public class VariableListenerNotifiable implements Comparable<VariableListenerNo
         return globalOrder;
     }
 
-    public Set<VariableListenerNotification> getNotificationQueue() {
+    public Collection<VariableListenerNotification> getNotificationQueue() {
         return notificationQueue;
     }
 

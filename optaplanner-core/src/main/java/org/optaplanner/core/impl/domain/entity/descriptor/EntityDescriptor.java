@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.optaplanner.core.api.domain.entity.PlanningEntity;
+import org.optaplanner.core.api.domain.entity.PlanningPin;
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.domain.valuerange.ValueRangeProvider;
 import org.optaplanner.core.api.domain.variable.AnchorShadowVariable;
@@ -37,6 +38,7 @@ import org.optaplanner.core.config.heuristic.selector.common.decorator.Selection
 import org.optaplanner.core.config.util.ConfigUtils;
 import org.optaplanner.core.impl.domain.common.ReflectionHelper;
 import org.optaplanner.core.impl.domain.common.accessor.MemberAccessor;
+import org.optaplanner.core.impl.domain.common.accessor.MemberAccessorFactory;
 import org.optaplanner.core.impl.domain.policy.DescriptorPolicy;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import org.optaplanner.core.impl.domain.variable.anchor.AnchorShadowVariableDescriptor;
@@ -46,13 +48,15 @@ import org.optaplanner.core.impl.domain.variable.descriptor.ShadowVariableDescri
 import org.optaplanner.core.impl.domain.variable.descriptor.VariableDescriptor;
 import org.optaplanner.core.impl.domain.variable.inverserelation.InverseRelationShadowVariableDescriptor;
 import org.optaplanner.core.impl.heuristic.selector.common.decorator.ComparatorSelectionSorter;
+import org.optaplanner.core.impl.heuristic.selector.common.decorator.CompositeSelectionFilter;
 import org.optaplanner.core.impl.heuristic.selector.common.decorator.SelectionFilter;
 import org.optaplanner.core.impl.heuristic.selector.common.decorator.SelectionSorter;
 import org.optaplanner.core.impl.heuristic.selector.common.decorator.SelectionSorterWeightFactory;
 import org.optaplanner.core.impl.heuristic.selector.common.decorator.WeightFactorySelectionSorter;
+import org.optaplanner.core.impl.heuristic.selector.entity.decorator.PinEntityFilter;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 
-import static org.optaplanner.core.config.util.ConfigUtils.MemberAccessorType.*;
+import static org.optaplanner.core.impl.domain.common.accessor.MemberAccessorFactory.MemberAccessorType.*;
 
 /**
  * @param <Solution_> the solution type, the class with the {@link PlanningSolution} annotation
@@ -67,29 +71,57 @@ public class EntityDescriptor<Solution_> {
     private final SolutionDescriptor<Solution_> solutionDescriptor;
 
     private final Class<?> entityClass;
-    private SelectionFilter movableEntitySelectionFilter;
+    // Only declared movable filter, excludes inherited and descending movable filters
+    private SelectionFilter declaredMovableEntitySelectionFilter;
     private SelectionSorter decreasingDifficultySorter;
-
-    private List<EntityDescriptor<Solution_>> inheritedEntityDescriptorList;
 
     // Only declared variable descriptors, excludes inherited variable descriptors
     private Map<String, GenuineVariableDescriptor<Solution_>> declaredGenuineVariableDescriptorMap;
     private Map<String, ShadowVariableDescriptor<Solution_>> declaredShadowVariableDescriptorMap;
+
+    private List<SelectionFilter> declaredPinEntityFilterList;
+
+    private List<EntityDescriptor<Solution_>> inheritedEntityDescriptorList;
+
+    // Caches the inherited, declared and descending movable filters (including @PlanningPin filters) as a composite filter
+    private SelectionFilter effectiveMovableEntitySelectionFilter;
 
     // Caches the inherited and declared variable descriptors
     private Map<String, GenuineVariableDescriptor<Solution_>> effectiveGenuineVariableDescriptorMap;
     private Map<String, ShadowVariableDescriptor<Solution_>> effectiveShadowVariableDescriptorMap;
     private Map<String, VariableDescriptor<Solution_>> effectiveVariableDescriptorMap;
 
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
+
     public EntityDescriptor(SolutionDescriptor<Solution_> solutionDescriptor, Class<?> entityClass) {
         this.solutionDescriptor = solutionDescriptor;
         this.entityClass = entityClass;
     }
 
+    // ************************************************************************
+    // Lifecycle methods
+    // ************************************************************************
+
     public void processAnnotations(DescriptorPolicy descriptorPolicy) {
         processEntityAnnotations(descriptorPolicy);
-        processValueRangeProviderAnnotations(descriptorPolicy);
-        processPlanningVariableAnnotations(descriptorPolicy);
+        declaredGenuineVariableDescriptorMap = new LinkedHashMap<>();
+        declaredShadowVariableDescriptorMap = new LinkedHashMap<>();
+        declaredPinEntityFilterList = new ArrayList<>(2);
+        // Only iterate declared fields and methods, not inherited members, to avoid registering the same one twice
+        List<Member> memberList = ConfigUtils.getDeclaredMembers(entityClass);
+        for (Member member : memberList) {
+            processValueRangeProviderAnnotation(descriptorPolicy, member);
+            processPlanningVariableAnnotation(descriptorPolicy, member);
+            processPlanningPinAnnotation(descriptorPolicy, member);
+        }
+        if (declaredGenuineVariableDescriptorMap.isEmpty() && declaredShadowVariableDescriptorMap.isEmpty()) {
+            throw new IllegalStateException("The entityClass (" + entityClass
+                    + ") should have at least 1 getter method or 1 field with a "
+                    + PlanningVariable.class.getSimpleName() + " annotation or a shadow variable annotation.");
+        }
+        processVariableAnnotations(descriptorPolicy);
     }
 
     private void processEntityAnnotations(DescriptorPolicy descriptorPolicy) {
@@ -109,7 +141,7 @@ public class EntityDescriptor<Solution_> {
             movableEntitySelectionFilterClass = null;
         }
         if (movableEntitySelectionFilterClass != null) {
-            movableEntitySelectionFilter = ConfigUtils.newInstance(this,
+            declaredMovableEntitySelectionFilter = ConfigUtils.newInstance(this,
                     "movableEntitySelectionFilterClass", movableEntitySelectionFilterClass);
         }
     }
@@ -144,39 +176,22 @@ public class EntityDescriptor<Solution_> {
         }
     }
 
-    private void processValueRangeProviderAnnotations(DescriptorPolicy descriptorPolicy) {
-        // Only iterate declared fields and methods, not inherited members, to avoid registering the same one twice
-        List<Member> memberList = ConfigUtils.getDeclaredMembers(entityClass);
-        for (Member member : memberList) {
-            if (((AnnotatedElement) member).isAnnotationPresent(ValueRangeProvider.class)) {
-                MemberAccessor memberAccessor = ConfigUtils.buildMemberAccessor(
-                        member, FIELD_OR_READ_METHOD, ValueRangeProvider.class);
-                descriptorPolicy.addFromEntityValueRangeProvider(
-                        memberAccessor);
-            }
+    private void processValueRangeProviderAnnotation(DescriptorPolicy descriptorPolicy, Member member) {
+        if (((AnnotatedElement) member).isAnnotationPresent(ValueRangeProvider.class)) {
+            MemberAccessor memberAccessor = MemberAccessorFactory.buildMemberAccessor(
+                    member, FIELD_OR_READ_METHOD, ValueRangeProvider.class);
+            descriptorPolicy.addFromEntityValueRangeProvider(
+                    memberAccessor);
         }
     }
 
-    private void processPlanningVariableAnnotations(DescriptorPolicy descriptorPolicy) {
-        declaredGenuineVariableDescriptorMap = new LinkedHashMap<>();
-        declaredShadowVariableDescriptorMap = new LinkedHashMap<>();
-        boolean noVariableAnnotation = true;
-        // Only iterate declared fields and methods, not inherited members, to avoid registering the same one twice
-        List<Member> memberList = ConfigUtils.getDeclaredMembers(entityClass);
-        for (Member member : memberList) {
-            Class<? extends Annotation> variableAnnotationClass = ConfigUtils.extractAnnotationClass(
-                    member, VARIABLE_ANNOTATION_CLASSES);
-            if (variableAnnotationClass != null) {
-                noVariableAnnotation = false;
-                MemberAccessor memberAccessor = ConfigUtils.buildMemberAccessor(
-                        member, FIELD_OR_GETTER_METHOD_WITH_SETTER, variableAnnotationClass);
-                registerVariableAccessor(descriptorPolicy, variableAnnotationClass, memberAccessor);
-            }
-        }
-        if (noVariableAnnotation) {
-            throw new IllegalStateException("The entityClass (" + entityClass
-                    + ") should have at least 1 getter method or 1 field with a "
-                    + PlanningVariable.class.getSimpleName() + " annotation or a shadow variable annotation.");
+    private void processPlanningVariableAnnotation(DescriptorPolicy descriptorPolicy, Member member) {
+        Class<? extends Annotation> variableAnnotationClass = ConfigUtils.extractAnnotationClass(
+                member, VARIABLE_ANNOTATION_CLASSES);
+        if (variableAnnotationClass != null) {
+            MemberAccessor memberAccessor = MemberAccessorFactory.buildMemberAccessor(
+                    member, FIELD_OR_GETTER_METHOD_WITH_SETTER, variableAnnotationClass);
+            registerVariableAccessor(descriptorPolicy, variableAnnotationClass, memberAccessor);
         }
     }
 
@@ -193,41 +208,63 @@ public class EntityDescriptor<Solution_> {
                     + ") has a " + variableAnnotationClass.getSimpleName()
                     + " annotated member (" + memberAccessor
                     + ") that is duplicated by another member for variableDescriptor (" + duplicate + ").\n"
-                    + "  Verify that the annotation is not defined on both the field and its getter.");
+                    + "Maybe the annotation is defined on both the field and its getter.");
         }
         if (variableAnnotationClass.equals(PlanningVariable.class)) {
             GenuineVariableDescriptor<Solution_> variableDescriptor = new GenuineVariableDescriptor<>(this,
                     memberAccessor);
             declaredGenuineVariableDescriptorMap.put(memberName, variableDescriptor);
-            variableDescriptor.processAnnotations(descriptorPolicy);
         } else if (variableAnnotationClass.equals(InverseRelationShadowVariable.class)) {
             ShadowVariableDescriptor<Solution_> variableDescriptor = new InverseRelationShadowVariableDescriptor<>(
                     this, memberAccessor);
             declaredShadowVariableDescriptorMap.put(memberName, variableDescriptor);
-            variableDescriptor.processAnnotations(descriptorPolicy);
         } else if (variableAnnotationClass.equals(AnchorShadowVariable.class)) {
             ShadowVariableDescriptor<Solution_> variableDescriptor = new AnchorShadowVariableDescriptor<>(
                     this, memberAccessor);
             declaredShadowVariableDescriptorMap.put(memberName, variableDescriptor);
-            variableDescriptor.processAnnotations(descriptorPolicy);
         } else if (variableAnnotationClass.equals(CustomShadowVariable.class)) {
             ShadowVariableDescriptor<Solution_> variableDescriptor = new CustomShadowVariableDescriptor<>(
                     this, memberAccessor);
             declaredShadowVariableDescriptorMap.put(memberName, variableDescriptor);
-            variableDescriptor.processAnnotations(descriptorPolicy);
         } else {
             throw new IllegalStateException("The variableAnnotationClass ("
                     + variableAnnotationClass + ") is not implemented.");
         }
     }
 
-    public void linkInheritedEntityDescriptors(DescriptorPolicy descriptorPolicy) {
-        inheritedEntityDescriptorList = new ArrayList<>(4);
+    private void processPlanningPinAnnotation(DescriptorPolicy descriptorPolicy, Member member) {
+        if (((AnnotatedElement) member).isAnnotationPresent(PlanningPin.class)) {
+            MemberAccessor memberAccessor = MemberAccessorFactory.buildMemberAccessor(
+                    member, FIELD_OR_READ_METHOD, PlanningPin.class);
+            Class<?> type = memberAccessor.getType();
+            if (!Boolean.TYPE.isAssignableFrom(type) && !Boolean.class.isAssignableFrom(type)) {
+                throw new IllegalStateException("The entityClass (" + entityClass
+                        + ") has a " + PlanningPin.class.getSimpleName()
+                        + " annotated member (" + memberAccessor
+                        + ") that is not a boolean or Boolean.");
+            }
+            declaredPinEntityFilterList.add(new PinEntityFilter(memberAccessor));
+        }
+    }
+
+    private void processVariableAnnotations(DescriptorPolicy descriptorPolicy) {
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : declaredGenuineVariableDescriptorMap.values()) {
+            variableDescriptor.processAnnotations(descriptorPolicy);
+        }
+        for (ShadowVariableDescriptor<Solution_> variableDescriptor : declaredShadowVariableDescriptorMap.values()) {
+            variableDescriptor.processAnnotations(descriptorPolicy);
+        }
+    }
+
+    public void linkEntityDescriptors(DescriptorPolicy descriptorPolicy) {
         investigateParentsToLinkInherited(entityClass);
         createEffectiveVariableDescriptorMaps();
+        createEffectiveMovableEntitySelectionFilter();
+        // linkVariableDescriptors() is in a separate loop
     }
 
     private void investigateParentsToLinkInherited(Class<?> investigateClass) {
+        inheritedEntityDescriptorList = new ArrayList<>(4);
         if (investigateClass == null || investigateClass.isArray()) {
             return;
         }
@@ -237,19 +274,13 @@ public class EntityDescriptor<Solution_> {
         }
     }
 
-    private void linkInherited(Class<?> investigateClass) {
-        EntityDescriptor<Solution_> superEntityDescriptor = solutionDescriptor.getEntityDescriptorStrict(
-                investigateClass);
-        if (superEntityDescriptor != null) {
-            inheritedEntityDescriptorList.add(superEntityDescriptor);
+    private void linkInherited(Class<?> potentialEntityClass) {
+        EntityDescriptor<Solution_> entityDescriptor = solutionDescriptor.getEntityDescriptorStrict(
+                potentialEntityClass);
+        if (entityDescriptor != null) {
+            inheritedEntityDescriptorList.add(entityDescriptor);
         } else {
-            investigateParentsToLinkInherited(investigateClass);
-        }
-    }
-
-    public void linkShadowSources(DescriptorPolicy descriptorPolicy) {
-        for (ShadowVariableDescriptor<Solution_> shadowVariableDescriptor : declaredShadowVariableDescriptorMap.values()) {
-            shadowVariableDescriptor.linkShadowSources(descriptorPolicy);
+            investigateParentsToLinkInherited(potentialEntityClass);
         }
     }
 
@@ -268,6 +299,42 @@ public class EntityDescriptor<Solution_> {
         effectiveVariableDescriptorMap.putAll(effectiveShadowVariableDescriptorMap);
     }
 
+    private void createEffectiveMovableEntitySelectionFilter() {
+        if (declaredMovableEntitySelectionFilter != null && !hasAnyDeclaredGenuineVariableDescriptor()) {
+            throw new IllegalStateException("The entityClass (" + entityClass
+                    + ") has a movableEntitySelectionFilterClass (" + declaredMovableEntitySelectionFilter.getClass()
+                    + "), but it has no declared genuine variables, only shadow variables.");
+        }
+        List<SelectionFilter> selectionFilterList = new ArrayList<>();
+        // TODO Also add in child entity selectors
+        for (EntityDescriptor<Solution_> inheritedEntityDescriptor : inheritedEntityDescriptorList) {
+            if (inheritedEntityDescriptor.hasEffectiveMovableEntitySelectionFilter()) {
+                // Includes movable and pinned
+                selectionFilterList.add(inheritedEntityDescriptor.getEffectiveMovableEntitySelectionFilter());
+            }
+        }
+        if (declaredMovableEntitySelectionFilter != null) {
+            selectionFilterList.add(declaredMovableEntitySelectionFilter);
+        }
+        selectionFilterList.addAll(declaredPinEntityFilterList);
+        if (selectionFilterList.isEmpty()) {
+            effectiveMovableEntitySelectionFilter = null;
+        } else if (selectionFilterList.size() == 1) {
+            effectiveMovableEntitySelectionFilter = selectionFilterList.get(0);
+        } else {
+            effectiveMovableEntitySelectionFilter = new CompositeSelectionFilter(selectionFilterList);
+        }
+    }
+
+    public void linkVariableDescriptors(DescriptorPolicy descriptorPolicy) {
+        for (GenuineVariableDescriptor<Solution_> variableDescriptor : declaredGenuineVariableDescriptorMap.values()) {
+            variableDescriptor.linkVariableDescriptors(descriptorPolicy);
+        }
+        for (ShadowVariableDescriptor<Solution_> shadowVariableDescriptor : declaredShadowVariableDescriptorMap.values()) {
+            shadowVariableDescriptor.linkVariableDescriptors(descriptorPolicy);
+        }
+    }
+
     // ************************************************************************
     // Worker methods
     // ************************************************************************
@@ -284,12 +351,12 @@ public class EntityDescriptor<Solution_> {
         return entityClass.isAssignableFrom(entity.getClass());
     }
 
-    public boolean hasMovableEntitySelectionFilter() {
-        return movableEntitySelectionFilter != null;
+    public boolean hasEffectiveMovableEntitySelectionFilter() {
+        return effectiveMovableEntitySelectionFilter != null;
     }
 
-    public SelectionFilter getMovableEntitySelectionFilter() {
-        return movableEntitySelectionFilter;
+    public SelectionFilter getEffectiveMovableEntitySelectionFilter() {
+        return effectiveMovableEntitySelectionFilter;
     }
 
     public SelectionSorter getDecreasingDifficultySorter() {
@@ -374,28 +441,29 @@ public class EntityDescriptor<Solution_> {
     }
 
     public String buildInvalidVariableNameExceptionMessage(String variableName) {
-        if (!ReflectionHelper.hasGetterMethod(entityClass, variableName)) {
+        if (!ReflectionHelper.hasGetterMethod(entityClass, variableName)
+                && !ReflectionHelper.hasField(entityClass, variableName)) {
             String exceptionMessage = "The variableName (" + variableName
                     + ") for entityClass (" + entityClass
-                    + ") does not exists as a property (getter/setter) on that class.\n"
+                    + ") does not exists as a getter or field on that class.\n"
                     + "Check the spelling of the variableName (" + variableName + ").";
             if (variableName.length() >= 2
                     && !Character.isUpperCase(variableName.charAt(0))
                     && Character.isUpperCase(variableName.charAt(1))) {
-                String correctedVariableName = variableName.substring(0, 1).toUpperCase()
-                        + variableName.substring(1);
-                exceptionMessage += " It probably needs to be correctedVariableName ("
-                        + correctedVariableName + ") instead because the JavaBeans spec states" +
-                        " the first letter should be a upper case if the second is upper case.";
+                String correctedVariableName = variableName.substring(0, 1).toUpperCase() + variableName.substring(1);
+                exceptionMessage += "Maybe it needs to be correctedVariableName (" + correctedVariableName
+                        + ") instead, if it's a getter, because the JavaBeans spec states that "
+                        + "the first letter should be a upper case if the second is upper case.";
             }
             return exceptionMessage;
         }
         return "The variableName (" + variableName
                 + ") for entityClass (" + entityClass
-                + ") exists as a property (getter/setter) on that class,"
-                + " but not as an annotated as a planning variable.\n"
-                + "Check if your planning entity's getter has the annotation "
-                + PlanningVariable.class.getSimpleName() + " (or a shadow variable annotation).";
+                + ") exists as a getter or field on that class,"
+                + " but isn't in the planning variables (" + effectiveVariableDescriptorMap.keySet() + ").\n"
+                + (Character.isUpperCase(variableName.charAt(0)) ? "Maybe the variableName (" + variableName + ") should start with a lowercase.\n" : "")
+                + "Maybe your planning entity's getter or field lacks a " + PlanningVariable.class.getSimpleName()
+                + " annotation or a shadow variable annotation.";
     }
 
     public boolean hasAnyChainedGenuineVariables() {
@@ -466,7 +534,16 @@ public class EntityDescriptor<Solution_> {
     }
 
     public boolean isMovable(ScoreDirector<Solution_> scoreDirector, Object entity) {
-        return movableEntitySelectionFilter == null || movableEntitySelectionFilter.accept(scoreDirector, entity);
+        return effectiveMovableEntitySelectionFilter == null || effectiveMovableEntitySelectionFilter.accept(scoreDirector, entity);
+    }
+
+    /**
+     * @param scoreDirector never null
+     * @param entity never null
+     * @return true if the entity is initialized or immovable
+     */
+    public boolean isEntityInitializedOrImmovable(ScoreDirector<Solution_> scoreDirector, Object entity) {
+        return isInitialized(entity) || !isMovable(scoreDirector, entity);
     }
 
     @Override

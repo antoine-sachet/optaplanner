@@ -23,12 +23,12 @@ import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 import org.optaplanner.examples.nurserostering.domain.Employee;
+import org.optaplanner.examples.nurserostering.domain.NurseRoster;
 import org.optaplanner.examples.nurserostering.domain.ShiftAssignment;
 
-public class ShiftAssignmentSwapMove extends AbstractMove {
+public class ShiftAssignmentSwapMove extends AbstractMove<NurseRoster> {
 
     private ShiftAssignment leftShiftAssignment;
     private ShiftAssignment rightShiftAssignment;
@@ -39,21 +39,27 @@ public class ShiftAssignmentSwapMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<NurseRoster> scoreDirector) {
         return !Objects.equals(leftShiftAssignment.getEmployee(), rightShiftAssignment.getEmployee());
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public ShiftAssignmentSwapMove createUndoMove(ScoreDirector<NurseRoster> scoreDirector) {
         return new ShiftAssignmentSwapMove(rightShiftAssignment, leftShiftAssignment);
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<NurseRoster> scoreDirector) {
         Employee oldLeftEmployee = leftShiftAssignment.getEmployee();
         Employee oldRightEmployee = rightShiftAssignment.getEmployee();
         NurseRosteringMoveHelper.moveEmployee(scoreDirector, leftShiftAssignment, oldRightEmployee);
         NurseRosteringMoveHelper.moveEmployee(scoreDirector, rightShiftAssignment, oldLeftEmployee);
+    }
+
+    @Override
+    public ShiftAssignmentSwapMove rebase(ScoreDirector<NurseRoster> destinationScoreDirector) {
+        return new ShiftAssignmentSwapMove(destinationScoreDirector.lookUpWorkingObject(leftShiftAssignment),
+                destinationScoreDirector.lookUpWorkingObject(rightShiftAssignment));
     }
 
     @Override
@@ -66,6 +72,7 @@ public class ShiftAssignmentSwapMove extends AbstractMove {
         return Arrays.asList(leftShiftAssignment.getEmployee(), rightShiftAssignment.getEmployee());
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -80,6 +87,7 @@ public class ShiftAssignmentSwapMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(leftShiftAssignment)
@@ -87,6 +95,7 @@ public class ShiftAssignmentSwapMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         return leftShiftAssignment + " {" + leftShiftAssignment.getEmployee() + "} <-> "
                 + rightShiftAssignment + " {" + rightShiftAssignment.getEmployee() + "}";

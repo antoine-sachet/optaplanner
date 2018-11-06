@@ -23,12 +23,12 @@ import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.optaplanner.core.impl.heuristic.move.AbstractMove;
-import org.optaplanner.core.impl.heuristic.move.Move;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
+import org.optaplanner.examples.nqueens.domain.NQueens;
 import org.optaplanner.examples.nqueens.domain.Queen;
 import org.optaplanner.examples.nqueens.domain.Row;
 
-public class RowChangeMove extends AbstractMove {
+public class RowChangeMove extends AbstractMove<NQueens> {
 
     private Queen queen;
     private Row toRow;
@@ -39,20 +39,26 @@ public class RowChangeMove extends AbstractMove {
     }
 
     @Override
-    public boolean isMoveDoable(ScoreDirector scoreDirector) {
+    public boolean isMoveDoable(ScoreDirector<NQueens> scoreDirector) {
         return !Objects.equals(queen.getRow(), toRow);
     }
 
     @Override
-    public Move createUndoMove(ScoreDirector scoreDirector) {
+    public RowChangeMove createUndoMove(ScoreDirector<NQueens> scoreDirector) {
         return new RowChangeMove(queen, queen.getRow());
     }
 
     @Override
-    protected void doMoveOnGenuineVariables(ScoreDirector scoreDirector) {
+    protected void doMoveOnGenuineVariables(ScoreDirector<NQueens> scoreDirector) {
         scoreDirector.beforeVariableChanged(queen, "row"); // before changes are made
         queen.setRow(toRow);
         scoreDirector.afterVariableChanged(queen, "row"); // after changes are made
+    }
+
+    @Override
+    public RowChangeMove rebase(ScoreDirector<NQueens> destinationScoreDirector) {
+        return new RowChangeMove(destinationScoreDirector.lookUpWorkingObject(queen),
+                destinationScoreDirector.lookUpWorkingObject(toRow));
     }
 
     @Override
@@ -65,6 +71,7 @@ public class RowChangeMove extends AbstractMove {
         return Collections.singletonList(toRow);
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -79,6 +86,7 @@ public class RowChangeMove extends AbstractMove {
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(queen)
@@ -86,6 +94,7 @@ public class RowChangeMove extends AbstractMove {
                 .toHashCode();
     }
 
+    @Override
     public String toString() {
         return queen + " {" + queen.getRow() + " -> " + toRow + "}";
     }

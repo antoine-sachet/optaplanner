@@ -23,7 +23,6 @@ import org.optaplanner.core.impl.domain.entity.descriptor.EntityDescriptor;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import org.optaplanner.core.impl.domain.variable.descriptor.GenuineVariableDescriptor;
 import org.optaplanner.core.impl.testdata.domain.TestdataObject;
-import org.optaplanner.core.impl.testdata.domain.chained.TestdataChainedEntity;
 import org.optaplanner.core.impl.testdata.domain.chained.TestdataChainedObject;
 
 @PlanningEntity(movableEntitySelectionFilter = TestdataImmovableChainedEntityFilter.class)
@@ -41,7 +40,7 @@ public class TestdataImmovableChainedEntity extends TestdataObject implements Te
     }
 
     private TestdataChainedObject chainedObject;
-    private boolean locked;
+    private boolean pinned;
 
     public TestdataImmovableChainedEntity() {
     }
@@ -55,9 +54,9 @@ public class TestdataImmovableChainedEntity extends TestdataObject implements Te
         this.chainedObject = chainedObject;
     }
 
-    public TestdataImmovableChainedEntity(String code, TestdataChainedObject chainedObject, boolean locked) {
+    public TestdataImmovableChainedEntity(String code, TestdataChainedObject chainedObject, boolean pinned) {
         this(code, chainedObject);
-        this.locked = locked;
+        this.pinned = pinned;
     }
 
     @PlanningVariable(valueRangeProviderRefs = {"chainedAnchorRange", "chainedEntityRange"},
@@ -70,12 +69,12 @@ public class TestdataImmovableChainedEntity extends TestdataObject implements Te
         this.chainedObject = chainedObject;
     }
 
-    public boolean isLocked() {
-        return locked;
+    public boolean isPinned() {
+        return pinned;
     }
 
-    public void setLocked(boolean locked) {
-        this.locked = locked;
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
     }
 
     // ************************************************************************

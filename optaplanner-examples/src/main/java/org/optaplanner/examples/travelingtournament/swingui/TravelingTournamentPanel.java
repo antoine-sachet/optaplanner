@@ -22,6 +22,7 @@ import java.awt.event.ActionEvent;
 import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -48,10 +49,13 @@ public class TravelingTournamentPanel extends SolutionPanel<TravelingTournament>
 
     public static final String LOGO_PATH = "/org/optaplanner/examples/travelingtournament/swingui/travelingTournamentLogo.png";
 
+    private ImageIcon awayMatchIcon;
+
     private final TimeTablePanel<Team, Day> teamsPanel;
     private TangoColorFactory tangoColorFactory;
 
     public TravelingTournamentPanel() {
+        awayMatchIcon = new ImageIcon(getClass().getResource("awayMatch.png"));
         setLayout(new BorderLayout());
         JTabbedPane tabbedPane = new JTabbedPane();
         teamsPanel = new TimeTablePanel<>();
@@ -63,11 +67,6 @@ public class TravelingTournamentPanel extends SolutionPanel<TravelingTournament>
     @Override
     public boolean isWrapInScrollPane() {
         return false;
-    }
-
-    @Override
-    public boolean isRefreshScreenDuringSolving() {
-        return true;
     }
 
     @Override
@@ -124,13 +123,15 @@ public class TravelingTournamentPanel extends SolutionPanel<TravelingTournament>
     }
 
     private void fillMatchCells(TravelingTournament travelingTournament) {
+        preparePlanningEntityColors(travelingTournament.getMatchList());
         for (Match match : travelingTournament.getMatchList()) {
             Team homeTeam = match.getHomeTeam();
             Team awayTeam = match.getAwayTeam();
+            String toolTip = determinePlanningEntityTooltip(match);
             teamsPanel.addCell(homeTeam, match.getDay(),
-                    createButton(match, tangoColorFactory.pickColor(awayTeam), awayTeam.getLabel()));
+                    createButton(match, homeTeam, awayTeam, toolTip));
             teamsPanel.addCell(awayTeam, match.getDay(),
-                    createButton(match, tangoColorFactory.pickColor(homeTeam), homeTeam.getLabel()));
+                    createButton(match, awayTeam, homeTeam, toolTip));
         }
     }
 
@@ -143,10 +144,21 @@ public class TravelingTournamentPanel extends SolutionPanel<TravelingTournament>
         return headerPanel;
     }
 
-    private JButton createButton(Match match, Color color, String label) {
+    private JButton createButton(Match match, Team team, Team otherTeam, String toolTip) {
+        Color color = determinePlanningEntityColor(match, otherTeam);
+        String label = otherTeam.getLabel();
         JButton button = SwingUtils.makeSmallButton(new JButton(new MatchAction(match, label)));
+        if (match.getAwayTeam() == team) {
+            button.setIcon(awayMatchIcon);
+        }
         button.setBackground(color);
+        button.setToolTipText(toolTip);
         return button;
+    }
+
+    @Override
+    public boolean isIndictmentHeatMapEnabled() {
+        return true;
     }
 
     private class MatchAction extends AbstractAction {

@@ -19,6 +19,7 @@ package org.optaplanner.core.impl.solver.termination;
 import java.util.List;
 
 import org.optaplanner.core.impl.phase.scope.AbstractPhaseScope;
+import org.optaplanner.core.impl.solver.ChildThreadType;
 import org.optaplanner.core.impl.solver.scope.DefaultSolverScope;
 
 public class AndCompositeTermination extends AbstractCompositeTermination {
@@ -101,6 +102,21 @@ public class AndCompositeTermination extends AbstractCompositeTermination {
             }
         }
         return timeGradient;
+    }
+
+    // ************************************************************************
+    // Other methods
+    // ************************************************************************
+
+    @Override
+    public AndCompositeTermination createChildThreadTermination(
+            DefaultSolverScope solverScope, ChildThreadType childThreadType) {
+        return new AndCompositeTermination(createChildThreadTerminationList(solverScope, childThreadType));
+    }
+
+    @Override
+    public String toString() {
+        return "And(" + terminationList + ")";
     }
 
 }

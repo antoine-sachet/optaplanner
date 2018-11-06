@@ -1,25 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <solver>
-  <!--<environmentMode>FAST_ASSERT</environmentMode>-->
+  <!--<environmentMode>FULL_ASSERT</environmentMode>--><!-- To slowly prove there are no bugs in this code -->
+  <moveThreadCount>AUTO</moveThreadCount><!-- To solve faster by saturating multiple CPU cores -->
+
   <solutionClass>org.optaplanner.examples.examination.domain.Examination</solutionClass>
   <entityClass>org.optaplanner.examples.examination.domain.Exam</entityClass>
   <entityClass>org.optaplanner.examples.examination.domain.LeadingExam</entityClass>
   <entityClass>org.optaplanner.examples.examination.domain.FollowingExam</entityClass>
 
   <scoreDirectorFactory>
-    <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
     <scoreDrl>org/optaplanner/examples/examination/solver/examinationScoreRules.drl</scoreDrl>
-    <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>s
+    <initializingScoreTrend>ONLY_DOWN</initializingScoreTrend>
   </scoreDirectorFactory>
 
   <termination>
-    <!--
-      Official benchmark secondsSpentLimit allowed on:
-      - ge0ffrey's main pc: 429
-      - ge0ffrey's old pc: 1152
-    -->
-    <secondsSpentLimit>429</secondsSpentLimit>
-    <!--<bestScoreLimit>-0hard/-999999soft</bestScoreLimit>-->
+    <minutesSpentLimit>5</minutesSpentLimit>
   </termination>
   <constructionHeuristic>
     <queuedEntityPlacer>
@@ -32,9 +27,8 @@
       <cartesianProductMoveSelector>
         <changeMoveSelector>
           <entitySelector mimicSelectorRef="placerEntitySelector"/>
-          <valueSelector>
+          <valueSelector variableName="period">
             <downcastEntityClass>org.optaplanner.examples.examination.domain.LeadingExam</downcastEntityClass>
-            <variableName>period</variableName>
             <cacheType>PHASE</cacheType>
             <!--<selectionOrder>SORTED</selectionOrder>-->
             <!--<sorterManner>INCREASING_STRENGTH</sorterManner>-->
@@ -42,8 +36,7 @@
         </changeMoveSelector>
         <changeMoveSelector>
           <entitySelector mimicSelectorRef="placerEntitySelector"/>
-          <valueSelector>
-            <variableName>room</variableName>
+          <valueSelector variableName="room">
             <cacheType>PHASE</cacheType>
             <selectionOrder>SORTED</selectionOrder>
             <sorterManner>INCREASING_STRENGTH</sorterManner>
@@ -59,15 +52,12 @@
           <entitySelector id="cartesianProductEntitySelector">
             <entityClass>org.optaplanner.examples.examination.domain.Exam</entityClass>
           </entitySelector>
-          <valueSelector>
-            <variableName>room</variableName>
-          </valueSelector>
+          <valueSelector variableName="room"/>
         </changeMoveSelector>
         <changeMoveSelector>
           <entitySelector mimicSelectorRef="cartesianProductEntitySelector"/>
-          <valueSelector>
+          <valueSelector variableName="period">
             <downcastEntityClass>org.optaplanner.examples.examination.domain.LeadingExam</downcastEntityClass>
-            <variableName>period</variableName>
           </valueSelector>
         </changeMoveSelector>
       </cartesianProductMoveSelector>

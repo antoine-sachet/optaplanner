@@ -26,11 +26,8 @@ import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.domain.solution.drools.ProblemFactCollectionProperty;
 import org.optaplanner.core.api.domain.valuerange.ValueRangeProvider;
 import org.optaplanner.core.api.score.buildin.bendable.BendableScore;
-import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
-import org.optaplanner.core.impl.score.buildin.bendable.BendableScoreDefinition;
-import org.optaplanner.core.impl.score.buildin.hardsoft.HardSoftScoreDefinition;
 import org.optaplanner.examples.common.domain.AbstractPersistable;
-import org.optaplanner.persistence.xstream.impl.score.XStreamScoreConverter;
+import org.optaplanner.persistence.xstream.api.score.buildin.bendable.BendableScoreXStreamConverter;
 
 @PlanningSolution
 @XStreamAlias("TaTaskAssigningSolution")
@@ -50,8 +47,25 @@ public class TaskAssigningSolution extends AbstractPersistable {
     @ValueRangeProvider(id = "taskRange")
     private List<Task> taskList;
 
-    @XStreamConverter(value = XStreamScoreConverter.class, types = {BendableScoreDefinition.class}, ints = {1, 4})
+    @XStreamConverter(BendableScoreXStreamConverter.class)
+    @PlanningScore(bendableHardLevelsSize = 1, bendableSoftLevelsSize = 4)
     private BendableScore score;
+
+    /** Relates to {@link Task#getStartTime()}. */
+    private int frozenCutoff; // In minutes
+
+    public TaskAssigningSolution() {
+    }
+
+    public TaskAssigningSolution(long id, List<Skill> skillList, List<TaskType> taskTypeList,
+            List<Customer> customerList, List<Employee> employeeList, List<Task> taskList) {
+        super(id);
+        this.skillList = skillList;
+        this.taskTypeList = taskTypeList;
+        this.customerList = customerList;
+        this.employeeList = employeeList;
+        this.taskList = taskList;
+    }
 
     public List<Skill> getSkillList() {
         return skillList;
@@ -93,13 +107,20 @@ public class TaskAssigningSolution extends AbstractPersistable {
         this.taskList = taskList;
     }
 
-    @PlanningScore
     public BendableScore getScore() {
         return score;
     }
 
     public void setScore(BendableScore score) {
         this.score = score;
+    }
+
+    public int getFrozenCutoff() {
+        return frozenCutoff;
+    }
+
+    public void setFrozenCutoff(int frozenCutoff) {
+        this.frozenCutoff = frozenCutoff;
     }
 
     // ************************************************************************

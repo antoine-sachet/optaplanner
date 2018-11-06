@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.optaplanner</groupId>
     <artifactId>optaplanner-persistence</artifactId>
-    <version>7.0.0-SNAPSHOT</version>
+    <version>7.14.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>optaplanner-persistence-xstream</artifactId>
@@ -20,9 +20,10 @@
 
     This module contains the XStream integration.
   </description>
+  <url>https://www.optaplanner.org</url>
 
   <properties>
-    <osgi.Bundle-SymbolicName>org.optaplanner.persistence.xstream</osgi.Bundle-SymbolicName>
+    <java.module.name>org.optaplanner.persistence.xstream</java.module.name>
   </properties>
 
   <dependencies>
@@ -42,30 +43,13 @@
       <artifactId>optaplanner-persistence-common</artifactId>
     </dependency>
     <!-- External dependencies -->
-    <!-- Common utils -->
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
     <!-- Logging -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- XML -->
+    <!-- XML and JSON -->
     <dependency>
       <groupId>com.thoughtworks.xstream</groupId>
       <artifactId>xstream</artifactId>

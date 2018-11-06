@@ -20,12 +20,12 @@ import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.score.AbstractScore;
 import org.optaplanner.core.api.score.FeasibilityScore;
 import org.optaplanner.core.api.score.Score;
-import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 
 /**
  * This {@link Score} is based on 3 levels of long constraints: hard, medium and soft.
  * Hard constraints have priority over medium constraints.
  * Medium constraints have priority over soft constraints.
+ * Hard constraints determine feasibility.
  * <p>
  * This class is immutable.
  * @see Score
@@ -33,6 +33,7 @@ import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScore;
 public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftLongScore>
         implements FeasibilityScore<HardMediumSoftLongScore> {
 
+    public static final HardMediumSoftLongScore ZERO = new HardMediumSoftLongScore(0, 0L, 0L, 0L);
     private static final String HARD_LABEL = "hard";
     private static final String MEDIUM_LABEL = "medium";
     private static final String SOFT_LABEL = "soft";
@@ -44,15 +45,43 @@ public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftL
         long hardScore = parseLevelAsLong(HardMediumSoftLongScore.class, scoreString, scoreTokens[1]);
         long mediumScore = parseLevelAsLong(HardMediumSoftLongScore.class, scoreString, scoreTokens[2]);
         long softScore = parseLevelAsLong(HardMediumSoftLongScore.class, scoreString, scoreTokens[3]);
-        return valueOf(initScore, hardScore, mediumScore, softScore);
+        return ofUninitialized(initScore, hardScore, mediumScore, softScore);
     }
 
-    public static HardMediumSoftLongScore valueOf(int initScore, long hardScore, long mediumScore, long softScore) {
+    public static HardMediumSoftLongScore ofUninitialized(int initScore, long hardScore, long mediumScore, long softScore) {
         return new HardMediumSoftLongScore(initScore, hardScore, mediumScore, softScore);
     }
 
-    public static HardMediumSoftLongScore valueOfInitialized(long hardScore, long mediumScore, long softScore) {
+    /**
+     * @deprecated in favor of {@link #ofUninitialized(int, long, long, long)}
+     */
+    @Deprecated
+    public static HardMediumSoftLongScore valueOfUninitialized(int initScore, long hardScore, long mediumScore, long softScore) {
+        return new HardMediumSoftLongScore(initScore, hardScore, mediumScore, softScore);
+    }
+
+    public static HardMediumSoftLongScore of(long hardScore, long mediumScore, long softScore) {
         return new HardMediumSoftLongScore(0, hardScore, mediumScore, softScore);
+    }
+
+    /**
+     * @deprecated in favor of {@link #of(long, long, long)}
+     */
+    @Deprecated
+    public static HardMediumSoftLongScore valueOf(long hardScore, long mediumScore, long softScore) {
+        return new HardMediumSoftLongScore(0, hardScore, mediumScore, softScore);
+    }
+
+    public static HardMediumSoftLongScore ofHard(long hardScore) {
+        return new HardMediumSoftLongScore(0, hardScore, 0, 0);
+    }
+
+    public static HardMediumSoftLongScore ofMedium(long mediumScore) {
+        return new HardMediumSoftLongScore(0, 0, mediumScore, 0);
+    }
+
+    public static HardMediumSoftLongScore ofSoft(long softScore) {
+        return new HardMediumSoftLongScore(0, 0, 0, softScore);
     }
 
     // ************************************************************************
@@ -99,7 +128,7 @@ public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftL
      * The medium score is usually a negative number because most use cases only have negative constraints.
      * <p>
      * In a normal score comparison, the medium score is irrelevant if the 2 scores don't have the same hard score.
-     * @return higher is better, usually negative, 0 if no hard constraints are broken/fulfilled
+     * @return higher is better, usually negative, 0 if no medium constraints are broken/fulfilled
      */
     public long getMediumScore() {
         return mediumScore;
@@ -124,6 +153,12 @@ public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftL
     @Override
     public HardMediumSoftLongScore toInitializedScore() {
         return initScore == 0 ? this : new HardMediumSoftLongScore(0, hardScore, mediumScore, softScore);
+    }
+
+    @Override
+    public HardMediumSoftLongScore withInitScore(int newInitScore) {
+        assertNoInitScore();
+        return new HardMediumSoftLongScore(newInitScore, hardScore, mediumScore, softScore);
     }
 
     /**
@@ -190,6 +225,7 @@ public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftL
         return new Number[]{hardScore, mediumScore, softScore};
     }
 
+    @Override
     public boolean equals(Object o) {
         // A direct implementation (instead of EqualsBuilder) to avoid dependencies
         if (this == o) {
@@ -205,10 +241,11 @@ public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftL
         }
     }
 
+    @Override
     public int hashCode() {
         // A direct implementation (instead of HashCodeBuilder) to avoid dependencies
-        return (((((17 * 37)
-                + initScore)) * 37
+        return ((((17 * 37)
+                + initScore) * 37
                 + Long.valueOf(hardScore).hashCode()) * 37
                 + Long.valueOf(mediumScore).hashCode()) * 37
                 + Long.valueOf(softScore).hashCode();
@@ -229,8 +266,18 @@ public final class HardMediumSoftLongScore extends AbstractScore<HardMediumSoftL
     }
 
     @Override
+    public String toShortString() {
+        return buildShortString((n) -> ((Long) n).longValue() != 0L, HARD_LABEL, MEDIUM_LABEL, SOFT_LABEL);
+    }
+
+    @Override
     public String toString() {
         return getInitPrefix() + hardScore + HARD_LABEL + "/" + mediumScore + MEDIUM_LABEL + "/" + softScore + SOFT_LABEL;
+    }
+
+    @Override
+    public boolean isCompatibleArithmeticArgument(Score otherScore) {
+        return otherScore instanceof HardMediumSoftLongScore;
     }
 
 }

@@ -56,7 +56,7 @@
         <#assign scoreLevelIndex = 0>
         <#list chartFileList as chartFile>
             <li<#if scoreLevelIndex == benchmarkReport.defaultShownScoreLevelIndex> class="active"</#if>>
-                <a href="#${idPrefix}_chart_${scoreLevelIndex}" data-toggle="tab">Score level ${scoreLevelIndex}</a>
+                <a href="#${idPrefix}_chart_${scoreLevelIndex}" data-toggle="tab">${reportHelper.capitalize(benchmarkReport.plannerBenchmarkResult.findScoreLevelLabel(scoreLevelIndex))}</a>
             </li>
             <#assign scoreLevelIndex = scoreLevelIndex + 1>
         </#list>
@@ -81,7 +81,7 @@
         <div class="span2">
             <div class="benchmark-report-nav">
                 <div style="margin-top: 10px;">
-                    <a href="http://www.optaplanner.org">
+                    <a href="https://www.optaplanner.org">
                         <img src="website/img/optaPlannerLogo.png" alt="OptaPlanner"/>
                     </a>
                 </div>
@@ -319,24 +319,6 @@
                                 </table>
                             </div>
                         </div>
-                        <!-- HACK Duplication to show the navigation tabs in the same viewport as the tables -->
-                        <ul class="nav nav-pills">
-                            <li class="active">
-                                <a href="#summary_bestScore" data-toggle="tab">Best score</a>
-                            </li>
-                            <li>
-                                <a href="#summary_bestScoreScalability" data-toggle="tab">Best score scalability</a>
-                            </li>
-                            <li>
-                                <a href="#summary_bestScoreDistribution" data-toggle="tab">Best score distribution</a>
-                            </li>
-                            <li>
-                                <a href="#summary_winningScoreDifference" data-toggle="tab">Winning score difference</a>
-                            </li>
-                            <li>
-                                <a href="#summary_worstScoreDifferencePercentage" data-toggle="tab">Worst score difference percentage (ROI)</a>
-                            </li>
-                        </ul>
                     </div>
                 </section>
 
@@ -346,6 +328,9 @@
                         <ul class="nav nav-pills">
                             <li class="active">
                                 <a href="#summary_scoreCalculationSpeed" data-toggle="tab">Score calculation speed</a>
+                            </li>
+                            <li>
+                                <a href="#summary_worstScoreCalculationSpeedDifferencePercentage" data-toggle="tab">Worst score calculation speed difference percentage</a>
                             </li>
                             <li>
                                 <a href="#summary_timeSpent" data-toggle="tab">Time spent</a>
@@ -416,6 +401,51 @@
                                                         </ul>
                                                       </div></td>
                                                     </#if>
+                                                </#if>
+                                            </#if>
+                                        </#list>
+                                    </tr>
+                                </#list>
+                                </table>
+                            </div>
+                            <div class="tab-pane" id="summary_worstScoreCalculationSpeedDifferencePercentage">
+                                <h3>Worst score calculation speed difference percentage</h3>
+                                <p>
+                                    Useful for comparing different score calculators and/or score rule implementations
+                                    (presuming that the solver configurations do not differ otherwise).
+                                    Also useful to measure the scalability cost of an extra constraint.
+                                </p>
+                                <div class="benchmark-chart">
+                                    <img src="summary/${benchmarkReport.worstScoreCalculationSpeedDifferencePercentageSummaryChartFile.name}"/>
+                                </div>
+                                <table class="benchmark-table table table-striped table-bordered">
+                                    <tr>
+                                        <th rowspan="2">Solver</th>
+                                        <th rowspan="2">Average</th>
+                                        <th colspan="${benchmarkReport.plannerBenchmarkResult.unifiedProblemBenchmarkResultList?size}">Problem</th>
+                                    </tr>
+                                    <tr>
+                                    <#list benchmarkReport.plannerBenchmarkResult.unifiedProblemBenchmarkResultList as problemBenchmarkResult>
+                                        <th>${problemBenchmarkResult.name}</th>
+                                    </#list>
+                                    </tr>
+                                <#list benchmarkReport.plannerBenchmarkResult.solverBenchmarkResultList as solverBenchmarkResult>
+                                    <tr<#if solverBenchmarkResult.favorite> class="favoriteSolverBenchmark"</#if>>
+                                        <th>${solverBenchmarkResult.name}&nbsp;<@addSolverBenchmarkBadges solverBenchmarkResult=solverBenchmarkResult/></th>
+                                        <#if solverBenchmarkResult.averageWorstScoreCalculationSpeedDifferencePercentage??>
+                                            <td>${solverBenchmarkResult.averageWorstScoreCalculationSpeedDifferencePercentage?string["0.00%"]!""}</td>
+                                        <#else>
+                                            <td></td>
+                                        </#if>
+                                        <#list benchmarkReport.plannerBenchmarkResult.unifiedProblemBenchmarkResultList as problemBenchmarkResult>
+                                            <#if !solverBenchmarkResult.findSingleBenchmark(problemBenchmarkResult)??>
+                                                <td></td>
+                                            <#else>
+                                                <#assign singleBenchmarkResult = solverBenchmarkResult.findSingleBenchmark(problemBenchmarkResult)>
+                                                <#if !singleBenchmarkResult.hasAllSuccess()>
+                                                    <td><span class="label label-important">Failed</span></td>
+                                                <#else>
+                                                    <td>${singleBenchmarkResult.worstScoreCalculationSpeedDifferencePercentage?string["0.00%"]!""}</td>
                                                 </#if>
                                             </#if>
                                         </#list>
@@ -497,21 +527,6 @@
                                 <@addScoreLevelChartList chartFileList=benchmarkReport.bestScorePerTimeSpentSummaryChartFileList idPrefix="summary_bestScorePerTimeSpent" />
                             </div>
                         </div>
-                        <!-- HACK Duplication to show the navigation tabs in the same viewport as the tables -->
-                        <ul class="nav nav-pills">
-                            <li class="active">
-                                <a href="#summary_scoreCalculationSpeed" data-toggle="tab">Score calculation speed</a>
-                            </li>
-                            <li>
-                                <a href="#summary_timeSpent" data-toggle="tab">Time spent</a>
-                            </li>
-                            <li>
-                                <a href="#summary_timeSpentScalability" data-toggle="tab">Time spent scalability</a>
-                            </li>
-                            <li>
-                                <a href="#summary_bestScorePerTimeSpent" data-toggle="tab">Best score per time spent</a>
-                            </li>
-                        </ul>
                     </div>
                 </section>
             </section>
@@ -573,7 +588,7 @@
                                                         <#assign scoreLevelIndex = 0>
                                                         <#list problemStatistic.graphFileList as graphFile>
                                                             <li<#if scoreLevelIndex == benchmarkReport.defaultShownScoreLevelIndex> class="active"</#if>>
-                                                                <a href="#problemStatistic_${problemStatistic.anchorId}_${scoreLevelIndex}" data-toggle="tab">Score level ${scoreLevelIndex}</a>
+                                                                <a href="#problemStatistic_${problemStatistic.anchorId}_${scoreLevelIndex}" data-toggle="tab">${reportHelper.capitalize(problemBenchmarkResult.findScoreLevelLabel(scoreLevelIndex))}</a>
                                                             </li>
                                                             <#assign scoreLevelIndex = scoreLevelIndex + 1>
                                                         </#list>
@@ -620,7 +635,7 @@
                                                             <#assign scoreLevelIndex = 0>
                                                             <#list pureSubSingleStatistic.graphFileList as graphFile>
                                                                 <li<#if scoreLevelIndex == benchmarkReport.defaultShownScoreLevelIndex> class="active"</#if>>
-                                                                    <a href="#subSingleStatistic_${pureSubSingleStatistic.anchorId}_${scoreLevelIndex}" data-toggle="tab">Score level ${scoreLevelIndex}</a>
+                                                                    <a href="#subSingleStatistic_${pureSubSingleStatistic.anchorId}_${scoreLevelIndex}" data-toggle="tab">${reportHelper.capitalize(problemBenchmarkResult.findScoreLevelLabel(scoreLevelIndex))}</a>
                                                                 </li>
                                                                 <#assign scoreLevelIndex = scoreLevelIndex + 1>
                                                             </#list>
@@ -703,7 +718,7 @@
                     </tr>
                     <tr>
                         <th>Starting timestamp</th>
-                        <td>${(benchmarkReport.plannerBenchmarkResult.startingTimestamp?datetime?string.medium)!"Differs"}</td>
+                        <td>${(benchmarkReport.plannerBenchmarkResult.startingTimestampAsMediumString)!"Differs"}</td>
                     </tr>
                     <tr>
                         <th>Warm up time spent</th>
@@ -734,8 +749,12 @@
                         <td>${benchmarkReport.plannerBenchmarkResult.environmentMode!"Differs"}</td>
                     </tr>
                     <tr>
-                        <th>Logging level</th>
-                        <td>${benchmarkReport.plannerBenchmarkResult.loggingLevel!"Differs"}</td>
+                        <th>Logging level org.optaplanner.core</th>
+                        <td>${benchmarkReport.plannerBenchmarkResult.loggingLevelOptaPlannerCore!"Differs"}</td>
+                    </tr>
+                    <tr>
+                        <th>Logging level org.drools.core</th>
+                        <td>${benchmarkReport.plannerBenchmarkResult.loggingLevelDroolsCore!"Differs"}</td>
                     </tr>
                     <tr>
                         <th>Solver ranking class</th>
@@ -772,6 +791,10 @@
                     <tr>
                         <th>Report locale</th>
                         <td>${benchmarkReport.locale!"Unknown"}</td>
+                    </tr>
+                    <tr>
+                        <th>Report timezone</th>
+                        <td>${benchmarkReport.timezoneId!"Unknown"}</td>
                     </tr>
                 </table>
             </section>

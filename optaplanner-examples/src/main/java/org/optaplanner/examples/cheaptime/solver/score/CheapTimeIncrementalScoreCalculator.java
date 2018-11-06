@@ -20,11 +20,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.optaplanner.core.api.score.buildin.hardmediumsoftlong.HardMediumSoftLongScore;
 import org.optaplanner.core.api.score.constraint.ConstraintMatchTotal;
-import org.optaplanner.core.api.score.constraint.primlong.LongConstraintMatchTotal;
+import org.optaplanner.core.api.score.constraint.Indictment;
 import org.optaplanner.core.impl.score.director.incremental.AbstractIncrementalScoreCalculator;
 import org.optaplanner.core.impl.score.director.incremental.ConstraintMatchAwareIncrementalScoreCalculator;
 import org.optaplanner.examples.cheaptime.domain.CheapTimeSolution;
@@ -91,7 +92,7 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
         }
         for (TaskAssignment taskAssignment : solution.getTaskAssignmentList()) {
             // Do not do modifyMachine(taskAssignment, null, taskAssignment.getMachine());
-            // because modifyStartPeriod does all it's effects too
+            // because modifyStartPeriod does all its effects too
             modifyStartPeriod(taskAssignment, null, taskAssignment.getStartPeriod());
         }
     }
@@ -105,31 +106,37 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
     public void afterEntityAdded(Object entity) {
         TaskAssignment taskAssignment = (TaskAssignment) entity;
         // Do not do modifyMachine(taskAssignment, null, taskAssignment.getMachine());
-        // because modifyStartPeriod does all it's effects too
+        // because modifyStartPeriod does all its effects too
         modifyStartPeriod(taskAssignment, null, taskAssignment.getStartPeriod());
     }
 
     @Override
     public void beforeVariableChanged(Object entity, String variableName) {
         TaskAssignment taskAssignment = (TaskAssignment) entity;
-        if (variableName.equals("machine")) {
-            oldMachine = taskAssignment.getMachine();
-        } else if (variableName.equals("startPeriod")) {
-            oldStartPeriod = taskAssignment.getStartPeriod();
-        } else {
-            throw new IllegalArgumentException("The variableName (" + variableName + ") is not supported.");
+        switch (variableName) {
+            case "machine":
+                oldMachine = taskAssignment.getMachine();
+                break;
+            case "startPeriod":
+                oldStartPeriod = taskAssignment.getStartPeriod();
+                break;
+            default:
+                throw new IllegalArgumentException("The variableName (" + variableName + ") is not supported.");
         }
     }
 
     @Override
     public void afterVariableChanged(Object entity, String variableName) {
         TaskAssignment taskAssignment = (TaskAssignment) entity;
-        if (variableName.equals("machine")) {
-            modifyMachine(taskAssignment, oldMachine, taskAssignment.getMachine());
-        } else if (variableName.equals("startPeriod")) {
-            modifyStartPeriod(taskAssignment, oldStartPeriod, taskAssignment.getStartPeriod());
-        } else {
-            throw new IllegalArgumentException("The variableName (" + variableName + ") is not supported.");
+        switch (variableName) {
+            case "machine":
+                modifyMachine(taskAssignment, oldMachine, taskAssignment.getMachine());
+                break;
+            case "startPeriod":
+                modifyStartPeriod(taskAssignment, oldStartPeriod, taskAssignment.getStartPeriod());
+                break;
+            default:
+                throw new IllegalArgumentException("The variableName (" + variableName + ") is not supported.");
         }
     }
 
@@ -144,7 +151,7 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
     public void afterEntityRemoved(Object entity) {
         TaskAssignment taskAssignment = (TaskAssignment) entity;
         // Do not do modifyMachine(taskAssignment, oldMachine, null);
-        // because modifyStartPeriod does all it's effects too
+        // because modifyStartPeriod does all its effects too
         modifyStartPeriod(taskAssignment, oldStartPeriod, null);
     }
 
@@ -399,8 +406,8 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
     }
 
     @Override
-    public HardMediumSoftLongScore calculateScore(int initScore) {
-        return HardMediumSoftLongScore.valueOf(initScore, hardScore, mediumScore, softScore);
+    public HardMediumSoftLongScore calculateScore() {
+        return HardMediumSoftLongScore.of(hardScore, mediumScore, softScore);
     }
 
     private class MachinePeriodPart {
@@ -540,16 +547,17 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
     @Override
     public Collection<ConstraintMatchTotal> getConstraintMatchTotals() {
         List<Resource> resourceList = cheapTimeSolution.getResourceList();
-        LongConstraintMatchTotal resourceCapacityMatchTotal = new LongConstraintMatchTotal(
-                CONSTRAINT_PACKAGE, "resourceCapacity", 0);
-        LongConstraintMatchTotal spinUpDownMatchTotal = new LongConstraintMatchTotal(
-                CONSTRAINT_PACKAGE, "spinUpDown", 1);
-        LongConstraintMatchTotal machineConsumptionMatchTotal = new LongConstraintMatchTotal(
-                CONSTRAINT_PACKAGE, "machineConsumption", 1);
-        LongConstraintMatchTotal taskConsumptionMatchTotal = new LongConstraintMatchTotal(
-                CONSTRAINT_PACKAGE, "taskConsumption", 1);
-        LongConstraintMatchTotal minimizeTaskStartPeriodMatchTotal = new LongConstraintMatchTotal(
-                CONSTRAINT_PACKAGE, "minimizeTaskStartPeriod", 2);
+        ConstraintMatchTotal resourceCapacityMatchTotal = new ConstraintMatchTotal(
+                CONSTRAINT_PACKAGE, "resourceCapacity", HardMediumSoftLongScore.ZERO);
+        ConstraintMatchTotal spinUpDownMatchTotal = new ConstraintMatchTotal(
+                CONSTRAINT_PACKAGE, "spinUpDown", HardMediumSoftLongScore.ZERO);
+        ConstraintMatchTotal machineConsumptionMatchTotal = new ConstraintMatchTotal(
+                CONSTRAINT_PACKAGE, "machineConsumption", HardMediumSoftLongScore.ZERO);
+        ConstraintMatchTotal taskConsumptionMatchTotal = new ConstraintMatchTotal(
+                CONSTRAINT_PACKAGE, "taskConsumption", HardMediumSoftLongScore.ZERO);
+        ConstraintMatchTotal minimizeTaskStartPeriodMatchTotal = new ConstraintMatchTotal(
+                CONSTRAINT_PACKAGE, "minimizeTaskStartPeriod", HardMediumSoftLongScore.ZERO);
+        long taskConsumptionWeight = mediumScore;
         for (Machine machine : cheapTimeSolution.getMachineList()) {
             for (int period = 0; period < globalPeriodRangeTo; period++) {
                 MachinePeriodPart machinePeriod = machineToMachinePeriodListMap[machine.getIndex()][period];
@@ -557,32 +565,36 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
                     int resourceAvailable = machinePeriod.resourceAvailableList[i];
                     if (resourceAvailable < 0) {
                         resourceCapacityMatchTotal.addConstraintMatch(
-                                Arrays.<Object>asList(machine, period, resourceList.get(i)),
-                                resourceAvailable);
+                                Arrays.asList(machine, period, resourceList.get(i)),
+                                HardMediumSoftLongScore.of(resourceAvailable, 0, 0));
                     }
                 }
                 if (machinePeriod.status == MachinePeriodStatus.SPIN_UP_AND_ACTIVE) {
                     spinUpDownMatchTotal.addConstraintMatch(
-                            Arrays.<Object>asList(machine, period),
-                            - machine.getSpinUpDownCostMicros());
+                            Arrays.asList(machine, period),
+                            HardMediumSoftLongScore.of(0, - machine.getSpinUpDownCostMicros(), 0));
+                    taskConsumptionWeight += machine.getSpinUpDownCostMicros();
                 }
                 if (machinePeriod.status != MachinePeriodStatus.OFF) {
                     machineConsumptionMatchTotal.addConstraintMatch(
-                            Arrays.<Object>asList(machine, period),
-                            - machinePeriod.machineCostMicros);
+                            Arrays.asList(machine, period),
+                            HardMediumSoftLongScore.of(0, - machinePeriod.machineCostMicros, 0));
+                    taskConsumptionWeight += machinePeriod.machineCostMicros;
                 }
             }
         }
         // Individual taskConsumption isn't tracked for performance
-        taskConsumptionMatchTotal.addConstraintMatch(Arrays.<Object>asList(),
-                mediumScore - spinUpDownMatchTotal.getWeightTotal() - machineConsumptionMatchTotal.getWeightTotal());
+        taskConsumptionMatchTotal.addConstraintMatch(
+                Arrays.asList(),
+                HardMediumSoftLongScore.of(0, taskConsumptionWeight, 0));
         // Individual taskStartPeriod isn't tracked for performance
         // but we mimic it
         for (TaskAssignment taskAssignment : cheapTimeSolution.getTaskAssignmentList()) {
             Integer startPeriod = taskAssignment.getStartPeriod();
             if (startPeriod != null) {
-                minimizeTaskStartPeriodMatchTotal.addConstraintMatch(Arrays.<Object>asList(taskAssignment),
-                        - startPeriod);
+                minimizeTaskStartPeriodMatchTotal.addConstraintMatch(
+                        Arrays.asList(taskAssignment),
+                        HardMediumSoftLongScore.of(0, 0, - startPeriod));
             }
 
         }
@@ -594,6 +606,11 @@ public class CheapTimeIncrementalScoreCalculator extends AbstractIncrementalScor
         constraintMatchTotalList.add(taskConsumptionMatchTotal);
         constraintMatchTotalList.add(minimizeTaskStartPeriodMatchTotal);
         return constraintMatchTotalList;
+    }
+
+    @Override
+    public Map<Object, Indictment> getIndictmentMap() {
+        return null; // Calculate it non-incrementally from getConstraintMatchTotals()
     }
 
     private enum MachinePeriodStatus {

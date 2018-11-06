@@ -19,7 +19,6 @@ package org.optaplanner.core.impl.heuristic.selector.value.chained;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -130,8 +129,7 @@ public class DefaultSubChainSelector extends AbstractSelector
                     + ") with valueSize (" + valueSize
                     + ") which is higher than Integer.MAX_VALUE.");
         }
-        // Temporary LinkedList to avoid using a bad initialCapacity
-        List<Object> anchorList = new LinkedList<>();
+        List<Object> anchorList = new ArrayList<>();
         for (Object value : valueSelector) {
             if (variableDescriptor.isValuePotentialAnchor(value)) {
                 anchorList.add(value);

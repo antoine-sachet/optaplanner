@@ -36,15 +36,15 @@ import com.thoughtworks.xstream.annotations.XStreamOmitField;
 import org.optaplanner.benchmark.config.ProblemBenchmarksConfig;
 import org.optaplanner.benchmark.config.statistic.ProblemStatisticType;
 import org.optaplanner.benchmark.config.statistic.SingleStatisticType;
+import org.optaplanner.benchmark.impl.loader.ProblemProvider;
 import org.optaplanner.benchmark.impl.measurement.ScoreDifferencePercentage;
-import org.optaplanner.benchmark.impl.ranking.SingleBenchmarkRankingComparator;
+import org.optaplanner.benchmark.impl.ranking.TotalScoreSingleBenchmarkRankingComparator;
 import org.optaplanner.benchmark.impl.report.BenchmarkReport;
 import org.optaplanner.benchmark.impl.report.ReportHelper;
 import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.PureSubSingleStatistic;
 import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.config.util.ConfigUtils;
-import org.optaplanner.persistence.common.api.domain.solution.SolutionFileIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,11 +61,8 @@ public class ProblemBenchmarkResult<Solution_> {
 
     private String name = null;
 
-    @XStreamOmitField // TODO move solutionFileIO out of ProblemBenchmarkResult
-    private SolutionFileIO<Solution_> solutionFileIO = null;
+    private ProblemProvider<Solution_> problemProvider;
     private boolean writeOutputSolutionEnabled = false;
-
-    private File inputSolutionFile = null;
 
     @XStreamImplicit(itemFieldName = "problemStatistic")
     private List<ProblemStatistic> problemStatisticList = null;
@@ -89,6 +86,11 @@ public class ProblemBenchmarkResult<Solution_> {
     private Integer failureCount = null;
     private SingleBenchmarkResult winningSingleBenchmarkResult = null;
     private SingleBenchmarkResult worstSingleBenchmarkResult = null;
+    private Long worstScoreCalculationSpeed = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public ProblemBenchmarkResult(PlannerBenchmarkResult plannerBenchmarkResult) {
         this.plannerBenchmarkResult = plannerBenchmarkResult;
@@ -113,12 +115,12 @@ public class ProblemBenchmarkResult<Solution_> {
         this.name = name;
     }
 
-    public SolutionFileIO<Solution_> getSolutionFileIO() {
-        return solutionFileIO;
+    public ProblemProvider<Solution_> getProblemProvider() {
+        return problemProvider;
     }
 
-    public void setSolutionFileIO(SolutionFileIO<Solution_> solutionFileIO) {
-        this.solutionFileIO = solutionFileIO;
+    public void setProblemProvider(ProblemProvider<Solution_> problemProvider) {
+        this.problemProvider = problemProvider;
     }
 
     public boolean isWriteOutputSolutionEnabled() {
@@ -127,14 +129,6 @@ public class ProblemBenchmarkResult<Solution_> {
 
     public void setWriteOutputSolutionEnabled(boolean writeOutputSolutionEnabled) {
         this.writeOutputSolutionEnabled = writeOutputSolutionEnabled;
-    }
-
-    public File getInputSolutionFile() {
-        return inputSolutionFile;
-    }
-
-    public void setInputSolutionFile(File inputSolutionFile) {
-        this.inputSolutionFile = inputSolutionFile;
     }
 
     public List<ProblemStatistic> getProblemStatisticList() {
@@ -189,12 +183,21 @@ public class ProblemBenchmarkResult<Solution_> {
         return worstSingleBenchmarkResult;
     }
 
+    public Long getWorstScoreCalculationSpeed() {
+        return worstScoreCalculationSpeed;
+    }
+
     // ************************************************************************
     // Smart getters
     // ************************************************************************
 
     public String getAnchorId() {
         return ReportHelper.escapeHtmlId(name);
+    }
+
+    public String findScoreLevelLabel(int scoreLevel) {
+        String[] levelLabels = singleBenchmarkResultList.get(0).getSolverBenchmarkResult().getScoreDefinition().getLevelLabels();
+        return levelLabels[scoreLevel];
     }
 
     public File getBenchmarkReportDirectory() {
@@ -257,7 +260,7 @@ public class ProblemBenchmarkResult<Solution_> {
     // Work methods
     // ************************************************************************
 
-    public String getProblemReportDirectoryPath() {
+    public String getProblemReportDirectoryName() {
         return name;
     }
 
@@ -281,17 +284,15 @@ public class ProblemBenchmarkResult<Solution_> {
         return totalSubSingleCount;
     }
 
-    public Solution_ readPlanningProblem() {
-        return solutionFileIO.read(inputSolutionFile);
+    public Solution_ readProblem() {
+        return problemProvider.readProblem();
     }
 
-    public void writeOutputSolution(SubSingleBenchmarkResult subSingleBenchmarkResult, Solution_ outputSolution) {
+    public void writeSolution(SubSingleBenchmarkResult subSingleBenchmarkResult, Solution_ solution) {
         if (!writeOutputSolutionEnabled) {
             return;
         }
-        String filename = getName() + "." + solutionFileIO.getOutputFileExtension();
-        File outputSolutionFile = new File(subSingleBenchmarkResult.getResultDirectory(), filename);
-        solutionFileIO.write(outputSolution, outputSolutionFile);
+        problemProvider.writeSolution(solution, subSingleBenchmarkResult);
     }
 
     // ************************************************************************
@@ -312,6 +313,7 @@ public class ProblemBenchmarkResult<Solution_> {
     private void determineTotalsAndAveragesAndRanking() {
         failureCount = 0;
         maximumSubSingleCount = 0;
+        worstScoreCalculationSpeed = null;
         long totalUsedMemoryAfterInputSolution = 0L;
         int usedMemoryAfterInputSolutionCount = 0;
         List<SingleBenchmarkResult> successResultList = new ArrayList<>(singleBenchmarkResultList);
@@ -330,6 +332,10 @@ public class ProblemBenchmarkResult<Solution_> {
                     totalUsedMemoryAfterInputSolution += singleBenchmarkResult.getUsedMemoryAfterInputSolution();
                     usedMemoryAfterInputSolutionCount++;
                 }
+                if (worstScoreCalculationSpeed == null
+                        || singleBenchmarkResult.getScoreCalculationSpeed() < worstScoreCalculationSpeed) {
+                    worstScoreCalculationSpeed = singleBenchmarkResult.getScoreCalculationSpeed();
+                }
             }
         }
         if (usedMemoryAfterInputSolutionCount > 0) {
@@ -340,8 +346,8 @@ public class ProblemBenchmarkResult<Solution_> {
     }
 
     private void determineRanking(List<SingleBenchmarkResult> rankedSingleBenchmarkResultList) {
-        Comparator singleBenchmarkRankingComparator = new SingleBenchmarkRankingComparator();
-        Collections.sort(rankedSingleBenchmarkResultList, Collections.reverseOrder(singleBenchmarkRankingComparator));
+        Comparator<SingleBenchmarkResult> singleBenchmarkRankingComparator = new TotalScoreSingleBenchmarkRankingComparator();
+        rankedSingleBenchmarkResultList.sort(Collections.reverseOrder(singleBenchmarkRankingComparator));
         int ranking = 0;
         SingleBenchmarkResult previousSingleBenchmarkResult = null;
         int previousSameRankingCount = 0;
@@ -370,11 +376,15 @@ public class ProblemBenchmarkResult<Solution_> {
             singleBenchmarkResult.setWorstScoreDifferencePercentage(
                     ScoreDifferencePercentage.calculateScoreDifferencePercentage(
                             worstSingleBenchmarkResult.getAverageScore(), singleBenchmarkResult.getAverageScore()));
+            singleBenchmarkResult.setWorstScoreCalculationSpeedDifferencePercentage(
+                    ScoreDifferencePercentage.calculateDifferencePercentage(
+                            (double) worstScoreCalculationSpeed,
+                            (double) singleBenchmarkResult.getScoreCalculationSpeed()));
         }
     }
 
     /**
-     * HACK to avoid loading the planningProblem just to extract it's problemScale.
+     * HACK to avoid loading the problem just to extract its problemScale.
      * Called multiple times, for every {@link SingleBenchmarkResult} of this {@link ProblemBenchmarkResult}.
      *
      * @param registeringEntityCount {@code >= 0}
@@ -422,7 +432,7 @@ public class ProblemBenchmarkResult<Solution_> {
     }
 
     /**
-     * Used by {@link ProblemBenchmarksConfig#buildProblemBenchmarkList(SolverBenchmarkResult)}.
+     * Used by {@link ProblemBenchmarksConfig#buildProblemBenchmarkList}.
      * @param o sometimes null
      * @return true if equal
      */
@@ -432,7 +442,7 @@ public class ProblemBenchmarkResult<Solution_> {
             return true;
         } else if (o instanceof ProblemBenchmarkResult) {
             ProblemBenchmarkResult other = (ProblemBenchmarkResult) o;
-            return inputSolutionFile.equals(other.getInputSolutionFile());
+            return problemProvider.equals(other.getProblemProvider());
         } else {
             return false;
         }
@@ -440,7 +450,7 @@ public class ProblemBenchmarkResult<Solution_> {
 
     @Override
     public int hashCode() {
-        return inputSolutionFile.hashCode();
+        return problemProvider.hashCode();
     }
 
     // ************************************************************************
@@ -452,15 +462,15 @@ public class ProblemBenchmarkResult<Solution_> {
         // IdentityHashMap but despite that different ProblemBenchmarkResult instances are merged
         Map<ProblemBenchmarkResult, ProblemBenchmarkResult> mergeMap
                 = new IdentityHashMap<>();
-        Map<File, ProblemBenchmarkResult> fileToNewResultMap = new HashMap<>();
+        Map<ProblemProvider<Solution_>, ProblemBenchmarkResult> problemProviderToNewResultMap = new HashMap<>();
         for (SingleBenchmarkResult singleBenchmarkResult : singleBenchmarkResultList) {
             ProblemBenchmarkResult<Solution_> oldResult = singleBenchmarkResult.getProblemBenchmarkResult();
             if (!mergeMap.containsKey(oldResult)) {
                 ProblemBenchmarkResult<Solution_> newResult;
-                if (!fileToNewResultMap.containsKey(oldResult.inputSolutionFile)) {
+                if (!problemProviderToNewResultMap.containsKey(oldResult.problemProvider)) {
                     newResult = new ProblemBenchmarkResult<>(newPlannerBenchmarkResult);
                     newResult.name = oldResult.name;
-                    newResult.inputSolutionFile = oldResult.inputSolutionFile;
+                    newResult.problemProvider = oldResult.problemProvider;
                     // Skip oldResult.problemReportDirectory
                     newResult.problemStatisticList = new ArrayList<>(oldResult.problemStatisticList.size());
                     for (ProblemStatistic oldProblemStatistic : oldResult.problemStatisticList) {
@@ -473,22 +483,18 @@ public class ProblemBenchmarkResult<Solution_> {
                     newResult.variableCount = oldResult.variableCount;
                     newResult.maximumValueCount = oldResult.maximumValueCount;
                     newResult.problemScale = oldResult.problemScale;
-                    fileToNewResultMap.put(oldResult.inputSolutionFile, newResult);
+                    problemProviderToNewResultMap.put(oldResult.problemProvider, newResult);
                     newPlannerBenchmarkResult.getUnifiedProblemBenchmarkResultList().add(newResult);
                 } else {
-                    newResult = fileToNewResultMap.get(oldResult.inputSolutionFile);
+                    newResult = problemProviderToNewResultMap.get(oldResult.problemProvider);
                     if (!Objects.equals(oldResult.name, newResult.name)) {
                         throw new IllegalStateException(
                                 "The oldResult (" + oldResult + ") and newResult (" + newResult
-                                + ") should have the same name, because they have the same inputSolutionFile ("
-                                + oldResult.inputSolutionFile + ").");
+                                + ") should have the same name, because they have the same problemProvider ("
+                                + oldResult.problemProvider + ").");
                     }
-                    for (Iterator<ProblemStatistic> it = newResult.problemStatisticList.iterator(); it.hasNext(); ) {
-                        ProblemStatistic newStatistic = it.next();
-                        if (!oldResult.hasProblemStatisticType(newStatistic.getProblemStatisticType())) {
-                            it.remove();
-                        }
-                    }
+                    newResult.problemStatisticList.removeIf(
+                            newStatistic -> !oldResult.hasProblemStatisticType(newStatistic.getProblemStatisticType()));
                     newResult.entityCount = ConfigUtils.meldProperty(oldResult.entityCount, newResult.entityCount);
                     newResult.variableCount = ConfigUtils.meldProperty(oldResult.variableCount, newResult.variableCount);
                     newResult.maximumValueCount = ConfigUtils.meldProperty(oldResult.maximumValueCount, newResult.maximumValueCount);

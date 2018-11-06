@@ -29,6 +29,7 @@ import org.optaplanner.core.impl.score.definition.ScoreDefinition;
  * and therefore slightly violate the transitive requirement of {@link Comparable#compareTo(Object)}.
  * <p>
  * An implementation must extend {@link AbstractScore} to ensure backwards compatibility in future versions.
+ * @param <S> the actual score type
  * @see AbstractScore
  * @see HardSoftScore
  */
@@ -36,8 +37,8 @@ public interface Score<S extends Score> extends Comparable<S> {
 
     /**
      * The init score is the negative of the number of uninitialized genuine planning variables.
-     * If it's 0 (which is usually is), the {@link PlanningSolution} is fully initialized
-     * and the score's {@link #toString()} does not mention it.
+     * If it's 0 (which it usually is), the {@link PlanningSolution} is fully initialized
+     * and the score's {@link Object#toString()} does not mention it.
      * <p>
      * During {@link #compareTo(Object)}, it's even more important than the hard score:
      * if you don't want this behaviour, read about overconstrained planning in the reference manual.
@@ -58,6 +59,14 @@ public interface Score<S extends Score> extends Comparable<S> {
     S toInitializedScore();
 
     /**
+     * For example {@code 0hard/-8soft} with {@code -7} returns {@code -7init/0hard/-8soft}.
+     * @param newInitScore always negative (except in statistical calculations), 0 if all planning variables are initialized
+     * @return equals score except that {@link #getInitScore()} is set to {@code newInitScore}
+     * @throws IllegalStateException if the original {@link #getInitScore()} is not 0
+     */
+    S withInitScore(int newInitScore);
+
+    /**
      * Returns a Score whose value is (this + augment).
      * @param augment value to be added to this Score
      * @return this + augment
@@ -73,7 +82,7 @@ public interface Score<S extends Score> extends Comparable<S> {
 
     /**
      * Returns a Score whose value is (this * multiplicand).
-     * When rounding is needed, it should be floored (as defined by {@link Math#floor(double)}.
+     * When rounding is needed, it should be floored (as defined by {@link Math#floor(double)}).
      * <p>
      * If the implementation has a scale/precision, then the unspecified scale/precision of the double multiplicand
      * should have no impact on the returned scale/precision.
@@ -84,7 +93,7 @@ public interface Score<S extends Score> extends Comparable<S> {
 
     /**
      * Returns a Score whose value is (this / divisor).
-     * When rounding is needed, it should be floored (as defined by {@link Math#floor(double)}.
+     * When rounding is needed, it should be floored (as defined by {@link Math#floor(double)}).
      * <p>
      * If the implementation has a scale/precision, then the unspecified scale/precision of the double divisor
      * should have no impact on the returned scale/precision.
@@ -95,7 +104,7 @@ public interface Score<S extends Score> extends Comparable<S> {
 
     /**
      * Returns a Score whose value is (this ^ exponent).
-     * When rounding is needed, it should be floored (as defined by {@link Math#floor(double)}.
+     * When rounding is needed, it should be floored (as defined by {@link Math#floor(double)}).
      * <p>
      * If the implementation has a scale/precision, then the unspecified scale/precision of the double exponent
      * should have no impact on the returned scale/precision.
@@ -114,7 +123,7 @@ public interface Score<S extends Score> extends Comparable<S> {
      * Returns an array of numbers representing the Score. Each number represents 1 score level.
      * A greater score level uses a lower array index than a lesser score level.
      * <p>
-     * When rounding is needed, each rounding should be floored (as defined by {@link Math#floor(double)}.
+     * When rounding is needed, each rounding should be floored (as defined by {@link Math#floor(double)}).
      * The length of the returned array must be stable for a specific {@link Score} implementation.
      * <p>
      * For example: {@code -0hard/-7soft} returns {@code new int{-0, -7}}
@@ -132,5 +141,15 @@ public interface Score<S extends Score> extends Comparable<S> {
      * and {@link #compareTo(Object)}.
      */
     boolean isCompatibleArithmeticArgument(Score otherScore);
+
+    /**
+     * Like {@link Object#toString()}, but trims score levels which have a zero weight.
+     * For example {@literal 0hard/-258soft} returns {@literal -258soft}.
+     * <p>
+     * Do not use this format to persist information as text, use {@link Object#toString()} instead,
+     * so it can be parsed reliably.
+     * @return never null
+     */
+    String toShortString();
 
 }

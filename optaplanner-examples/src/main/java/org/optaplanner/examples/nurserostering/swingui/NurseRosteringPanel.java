@@ -21,12 +21,10 @@ import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import javax.swing.AbstractAction;
 import javax.swing.BoxLayout;
@@ -116,11 +114,6 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
     }
 
     @Override
-    public boolean isRefreshScreenDuringSolving() {
-        return true;
-    }
-
-    @Override
     public void resetPanel(NurseRoster nurseRoster) {
         for (EmployeePanel employeePanel : employeeToPanelMap.values()) {
             if (employeePanel.getEmployee() != null) {
@@ -130,6 +123,7 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
         employeeToPanelMap.clear();
         employeeToPanelMap.put(null, unassignedPanel);
         unassignedPanel.clearShiftAssignments();
+        preparePlanningEntityColors(nurseRoster.getShiftAssignmentList());
         List<ShiftDate> shiftDateList = nurseRoster.getShiftDateList();
         List<Shift> shiftList = nurseRoster.getShiftList();
         unassignedPanel.setShiftDateListAndShiftList(shiftDateList, shiftList);
@@ -140,6 +134,7 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
 
     @Override
     public void updatePanel(NurseRoster nurseRoster) {
+        preparePlanningEntityColors(nurseRoster.getShiftAssignmentList());
         List<ShiftDate> shiftDateList = nurseRoster.getShiftDateList();
         List<Shift> shiftList = nurseRoster.getShiftList();
         Set<Employee> deadEmployeeSet = new LinkedHashSet<>(employeeToPanelMap.keySet());
@@ -169,6 +164,11 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
         }
     }
 
+    @Override
+    public boolean isIndictmentHeatMapEnabled() {
+        return true;
+    }
+
     private void advancePlanningWindowStart() {
         logger.info("Advancing planningWindowStart.");
         if (solutionBusiness.isSolving()) {
@@ -193,8 +193,7 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
             ShiftDate newShiftDate = new ShiftDate();
             newShiftDate.setId(oldLastShiftDate.getId() + 1L);
             newShiftDate.setDayIndex(oldLastShiftDate.getDayIndex() + 1);
-            newShiftDate.setDateString(oldLastShiftDate.determineNextDateString());
-            newShiftDate.setDayOfWeek(oldLastShiftDate.getDayOfWeek().determineNextDayOfWeek());
+            newShiftDate.setDate(oldLastShiftDate.getDate().plusDays(1));
             List<Shift> refShiftList = planningWindowStart.getShiftList();
             List<Shift> newShiftList = new ArrayList<>(refShiftList.size());
             newShiftDate.setShiftList(newShiftList);
@@ -229,9 +228,10 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
             }
             windowStartIndex++;
             ShiftDate newPlanningWindowStart = shiftDateList.get(windowStartIndex);
+            scoreDirector.beforeProblemPropertyChanged(nurseRosterParametrization);
             nurseRosterParametrization.setPlanningWindowStart(newPlanningWindowStart);
             nurseRosterParametrization.setLastShiftDate(newShiftDate);
-            scoreDirector.afterProblemFactChanged(nurseRosterParametrization);
+            scoreDirector.afterProblemPropertyChanged(nurseRosterParametrization);
         }, true);
     }
 
@@ -239,28 +239,28 @@ public class NurseRosteringPanel extends SolutionPanel<NurseRoster> {
         logger.info("Scheduling delete of employee ({}).", employee);
         doProblemFactChange(scoreDirector -> {
             NurseRoster nurseRoster = scoreDirector.getWorkingSolution();
+            Employee workingEmployee = scoreDirector.lookUpWorkingObject(employee);
+            if (workingEmployee == null) {
+                // The employee has already been deleted (the UI asked to changed the same employee twice), so do nothing
+                return;
+            }
             // First remove the problem fact from all planning entities that use it
             for (ShiftAssignment shiftAssignment : nurseRoster.getShiftAssignmentList()) {
-                if (Objects.equals(shiftAssignment.getEmployee(), employee)) {
+                if (shiftAssignment.getEmployee() == workingEmployee) {
                     scoreDirector.beforeVariableChanged(shiftAssignment, "employee");
                     shiftAssignment.setEmployee(null);
                     scoreDirector.afterVariableChanged(shiftAssignment, "employee");
                 }
             }
-            scoreDirector.triggerVariableListeners();
             // A SolutionCloner does not clone problem fact lists (such as employeeList)
             // Shallow clone the employeeList so only workingSolution is affected, not bestSolution or guiSolution
-            nurseRoster.setEmployeeList(new ArrayList<>(nurseRoster.getEmployeeList()));
+            ArrayList<Employee> employeeList = new ArrayList<>(nurseRoster.getEmployeeList());
+            nurseRoster.setEmployeeList(employeeList);
             // Remove it the problem fact itself
-            for (Iterator<Employee> it = nurseRoster.getEmployeeList().iterator(); it.hasNext(); ) {
-                Employee workingEmployee = it.next();
-                if (Objects.equals(workingEmployee, employee)) {
-                    scoreDirector.beforeProblemFactRemoved(workingEmployee);
-                    it.remove(); // remove from list
-                    scoreDirector.afterProblemFactRemoved(employee);
-                    break;
-                }
-            }
+            scoreDirector.beforeProblemFactRemoved(workingEmployee);
+            employeeList.remove(workingEmployee);
+            scoreDirector.afterProblemFactRemoved(workingEmployee);
+            scoreDirector.triggerVariableListeners();
         });
     }
 

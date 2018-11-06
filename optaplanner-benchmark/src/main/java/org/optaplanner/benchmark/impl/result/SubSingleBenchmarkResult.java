@@ -25,7 +25,6 @@ import java.util.Map;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 import com.thoughtworks.xstream.annotations.XStreamImplicit;
 import com.thoughtworks.xstream.annotations.XStreamOmitField;
-import org.optaplanner.benchmark.impl.measurement.ScoreDifferencePercentage;
 import org.optaplanner.benchmark.impl.report.BenchmarkReport;
 import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.PureSubSingleStatistic;
@@ -34,7 +33,6 @@ import org.optaplanner.benchmark.impl.statistic.SubSingleStatistic;
 import org.optaplanner.core.api.score.FeasibilityScore;
 import org.optaplanner.core.api.score.Score;
 import org.optaplanner.core.api.solver.Solver;
-import org.optaplanner.core.impl.score.ScoreUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +43,7 @@ import org.slf4j.LoggerFactory;
 @XStreamAlias("subSingleBenchmarkResult")
 public class SubSingleBenchmarkResult implements BenchmarkResult {
 
-    protected static final transient Logger logger = LoggerFactory.getLogger(SubSingleBenchmarkResult.class);
+    private static final Logger logger = LoggerFactory.getLogger(SubSingleBenchmarkResult.class);
 
     @XStreamOmitField // Bi-directional relationship restored through BenchmarkResultIO
     private SingleBenchmarkResult singleBenchmarkResult;
@@ -68,12 +66,12 @@ public class SubSingleBenchmarkResult implements BenchmarkResult {
     // Report accumulates
     // ************************************************************************
 
-    // Compared to winningSubSingleBenchmarkResult in the same SubSingleBenchmarkResult (which might not be the overall favorite)
-    private Score winningScoreDifference = null;
-    private ScoreDifferencePercentage worstScoreDifferencePercentage = null;
-
     // Ranking starts from 0
     private Integer ranking = null;
+
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public SubSingleBenchmarkResult(SingleBenchmarkResult singleBenchmarkResult, int subSingleBenchmarkIndex) {
         this.singleBenchmarkResult = singleBenchmarkResult;
@@ -158,22 +156,6 @@ public class SubSingleBenchmarkResult implements BenchmarkResult {
 
     public void setScoreCalculationCount(long scoreCalculationCount) {
         this.scoreCalculationCount = scoreCalculationCount;
-    }
-
-    public Score getWinningScoreDifference() {
-        return winningScoreDifference;
-    }
-
-    public void setWinningScoreDifference(Score winningScoreDifference) {
-        this.winningScoreDifference = winningScoreDifference;
-    }
-
-    public ScoreDifferencePercentage getWorstScoreDifferencePercentage() {
-        return worstScoreDifferencePercentage;
-    }
-
-    public void setWorstScoreDifferencePercentage(ScoreDifferencePercentage worstScoreDifferencePercentage) {
-        this.worstScoreDifferencePercentage = worstScoreDifferencePercentage;
     }
 
     public Integer getRanking() {
@@ -267,7 +249,9 @@ public class SubSingleBenchmarkResult implements BenchmarkResult {
     // Merger methods
     // ************************************************************************
 
-    protected static SubSingleBenchmarkResult createMerge(SingleBenchmarkResult singleBenchmarkResult, SubSingleBenchmarkResult oldResult, int subSingleBenchmarkIndex) {
+    protected static SubSingleBenchmarkResult createMerge(
+            SingleBenchmarkResult singleBenchmarkResult, SubSingleBenchmarkResult oldResult,
+            int subSingleBenchmarkIndex) {
         SubSingleBenchmarkResult newResult = new SubSingleBenchmarkResult(singleBenchmarkResult, subSingleBenchmarkIndex);
         newResult.pureSubSingleStatisticList = new ArrayList<>(oldResult.pureSubSingleStatisticList.size());
         for (PureSubSingleStatistic oldSubSingleStatistic : oldResult.pureSubSingleStatisticList) {
@@ -281,7 +265,7 @@ public class SubSingleBenchmarkResult implements BenchmarkResult {
             if (!oldSubSingleStatistic.getCsvFile().exists()) {
                 if (oldResult.hasAnyFailure()) {
                     newSubSingleStatistic.initPointList();
-                    logger.debug("Old result ({}) is a failure, skipping merge of it's sub single statistic ({}).",
+                    logger.debug("Old result ({}) is a failure, skipping merge of its sub single statistic ({}).",
                             oldResult, oldSubSingleStatistic);
                     continue;
                 } else {

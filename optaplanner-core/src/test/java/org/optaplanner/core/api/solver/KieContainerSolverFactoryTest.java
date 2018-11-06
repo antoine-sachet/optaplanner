@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.util.Collections;
 
 import com.google.common.io.Resources;
 import org.drools.compiler.CommonTestMethodBase;
@@ -30,7 +31,12 @@ import org.kie.api.builder.ReleaseId;
 import org.kie.api.io.Resource;
 import org.kie.api.io.ResourceType;
 import org.kie.api.runtime.KieContainer;
+import org.optaplanner.core.config.score.director.ScoreDirectorFactoryConfig;
+import org.optaplanner.core.config.solver.SolverConfig;
+import org.optaplanner.core.impl.score.director.drools.DroolsScoreDirectorFactory;
 import org.optaplanner.core.impl.testdata.domain.TestdataSolution;
+
+import static org.junit.Assert.*;
 
 public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
 
@@ -56,9 +62,9 @@ public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
         return Resources.toString(url, Charset.forName("UTF-8"));
     }
 
-    protected ReleaseId deployTestdataKjar(String artifactid, String kmodulePath, String solverConfigPath)
+    protected ReleaseId deployTestdataKjar(String artifactId, String kmodulePath, String solverConfigPath)
             throws IOException {
-        ReleaseId releaseId = kieServices.newReleaseId("org.optaplanner.core.test", artifactid, "1.0.0");
+        ReleaseId releaseId = kieServices.newReleaseId("org.optaplanner.core.test", artifactId, "1.0.0");
 
         String kmodule = readResourceToString(kmodulePath);
         Resource valueClass = buildResource("org/optaplanner/core/impl/testdata/domain/classloaded/ClassloadedTestdataValue.java",
@@ -69,12 +75,18 @@ public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
                 "testdata/kjar/ClassloadedTestdataSolution.java");
         Resource scoreRules = buildResource("org/optaplanner/core/api/solver/kieContainerTestdataScoreRules.drl",
                 "testdata/kjar/scoreRules.drl");
-        Resource solverConfig = buildResource(solverConfigPath,
-                "testdata/kjar/solverConfig.solver");
+        if (solverConfigPath  != null) {
+            Resource solverConfig = buildResource(solverConfigPath,
+                    "testdata/kjar/solverConfig.solver");
 
-        createAndDeployJar(kieServices, kmodule, releaseId,
-                valueClass, entityClass, solutionClass,
-                scoreRules, solverConfig);
+            createAndDeployJar(kieServices, kmodule, releaseId,
+                    valueClass, entityClass, solutionClass,
+                    scoreRules, solverConfig);
+        } else {
+            createAndDeployJar(kieServices, kmodule, releaseId,
+                    valueClass, entityClass, solutionClass,
+                    scoreRules);
+        }
         return releaseId;
     }
 
@@ -92,6 +104,7 @@ public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
                 releaseId, "testdata/kjar/solverConfig.solver");
         Solver<TestdataSolution> solver = solverFactory.buildSolver();
         assertNotNull(solver);
+        assertNewKieSessionSucceeds(solver);
     }
 
     @Test
@@ -105,6 +118,7 @@ public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
                 kieContainer, "testdata/kjar/solverConfig.solver");
         Solver<TestdataSolution> solver = solverFactory.buildSolver();
         assertNotNull(solver);
+        assertNewKieSessionSucceeds(solver);
     }
 
     @Test
@@ -117,6 +131,7 @@ public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
                 releaseId, "testdata/kjar/solverConfig.solver");
         Solver<TestdataSolution> solver = solverFactory.buildSolver();
         assertNotNull(solver);
+        assertNewKieSessionSucceeds(solver);
     }
 
     @Test
@@ -125,22 +140,49 @@ public class KieContainerSolverFactoryTest extends CommonTestMethodBase {
                 "buildSolverWithDefaultKsessionKmodule",
                 "org/optaplanner/core/api/solver/kieContainerDefaultKsessionKmodule.xml",
                 "org/optaplanner/core/api/solver/kieContainerDefaultKsessionTestdataSolverConfig.xml");
-        SolverFactory<TestdataSolution> solverFactory = SolverFactory.createFromKieContainerXmlResource(
+        SolverFactory<?> solverFactory = SolverFactory.createFromKieContainerXmlResource(
                 releaseId, "testdata/kjar/solverConfig.solver");
-        Solver<TestdataSolution> solver = solverFactory.buildSolver();
+        Solver<?> solver = solverFactory.buildSolver();
         assertNotNull(solver);
+        assertNewKieSessionSucceeds(solver);
     }
 
     @Test
-    public void buildSolverWithEmptyKmodule() throws IOException {
+    public void buildSolverWithEmptyKmodule() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         ReleaseId releaseId = deployTestdataKjar(
                 "buildSolverWithEmptyKmodule",
                 "org/optaplanner/core/api/solver/kieContainerEmptyKmodule.xml",
                 "org/optaplanner/core/api/solver/kieContainerDefaultKsessionTestdataSolverConfig.xml");
-        SolverFactory<TestdataSolution> solverFactory = SolverFactory.createFromKieContainerXmlResource(
+        SolverFactory<?> solverFactory = SolverFactory.createFromKieContainerXmlResource(
                 releaseId, "testdata/kjar/solverConfig.solver");
-        Solver<TestdataSolution> solver = solverFactory.buildSolver();
+        Solver<?> solver = solverFactory.buildSolver();
         assertNotNull(solver);
+        assertNewKieSessionSucceeds(solver);
+    }
+
+    @Test
+    public void buildSolverEmptyWithKieContainer() throws IOException, ReflectiveOperationException {
+        ReleaseId releaseId = deployTestdataKjar(
+                "buildSolverWithReleaseId",
+                "org/optaplanner/core/api/solver/kieContainerNamedKsessionKmodule.xml", null);
+        KieContainer kieContainer = kieServices.newKieContainer(releaseId);
+        SolverFactory<?> solverFactory = SolverFactory.createEmptyFromKieContainer(kieContainer);
+        SolverConfig solverConfig = solverFactory.getSolverConfig();
+        solverConfig.setSolutionClass(
+                kieContainer.getClassLoader().loadClass("testdata.kjar.ClassloadedTestdataSolution"));
+        solverConfig.setEntityClassList(Collections.singletonList(
+                kieContainer.getClassLoader().loadClass("testdata.kjar.ClassloadedTestdataEntity")));
+        ScoreDirectorFactoryConfig scoreDirectorFactoryConfig = new ScoreDirectorFactoryConfig();
+        scoreDirectorFactoryConfig.setKsessionName("testdataKsession");
+        solverConfig.setScoreDirectorFactoryConfig(scoreDirectorFactoryConfig);
+        Solver<?> solver = solverFactory.buildSolver();
+        assertNotNull(solver);
+        assertNewKieSessionSucceeds(solver);
+    }
+
+    private void assertNewKieSessionSucceeds(Solver<?> solver) {
+        DroolsScoreDirectorFactory scoreDirectorFactory = (DroolsScoreDirectorFactory<?>) solver.getScoreDirectorFactory();
+        scoreDirectorFactory.newKieSession();
     }
 
 }

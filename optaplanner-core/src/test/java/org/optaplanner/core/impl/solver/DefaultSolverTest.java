@@ -24,8 +24,9 @@ import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.api.solver.SolverFactory;
 import org.optaplanner.core.config.constructionheuristic.ConstructionHeuristicPhaseConfig;
 import org.optaplanner.core.config.phase.custom.CustomPhaseConfig;
+import org.optaplanner.core.config.score.definition.ScoreDefinitionType;
 import org.optaplanner.core.config.solver.termination.TerminationConfig;
-import org.optaplanner.core.impl.phase.custom.DummyCustomPhaseCommand;
+import org.optaplanner.core.impl.phase.custom.NoChangeCustomPhaseCommand;
 import org.optaplanner.core.impl.testdata.domain.TestdataEntity;
 import org.optaplanner.core.impl.testdata.domain.TestdataSolution;
 import org.optaplanner.core.impl.testdata.domain.TestdataValue;
@@ -49,20 +50,24 @@ public class DefaultSolverTest {
         solution = solver.solve(solution);
         assertNotNull(solution);
         assertEquals(true, solution.getScore().isSolutionInitialized());
+        assertSame(solution, solver.getBestSolution());
     }
 
     @Test
     public void solveLegacy() {
         SolverFactory<TestdataLegacySolution> solverFactory = PlannerTestUtils.buildSolverFactory(
                 TestdataLegacySolution.class, TestdataEntity.class);
+        solverFactory.getSolverConfig().getScoreDirectorFactoryConfig()
+                .setScoreDefinitionType(ScoreDefinitionType.SIMPLE);
         Solver<TestdataLegacySolution> solver = solverFactory.buildSolver();
 
-        TestdataLegacySolution solution = new TestdataLegacySolution("s1");
+        TestdataLegacySolution solution = new TestdataLegacySolution();
         solution.setValueList(Arrays.asList(new TestdataValue("v1"), new TestdataValue("v2")));
         solution.setEntityList(Arrays.asList(new TestdataEntity("e1"), new TestdataEntity("e2")));
 
         solution = solver.solve(solution);
         assertNotNull(solution);
+        assertSame(solution, solver.getBestSolution());
     }
 
     @Test
@@ -70,7 +75,7 @@ public class DefaultSolverTest {
         SolverFactory<TestdataSolution> solverFactory = PlannerTestUtils.buildSolverFactory(
                 TestdataSolution.class, TestdataEntity.class);
         CustomPhaseConfig phaseConfig = new CustomPhaseConfig();
-        phaseConfig.setCustomPhaseCommandClassList(Collections.singletonList(DummyCustomPhaseCommand.class));
+        phaseConfig.setCustomPhaseCommandClassList(Collections.singletonList(NoChangeCustomPhaseCommand.class));
         solverFactory.getSolverConfig().setPhaseConfigList(Collections.singletonList(phaseConfig));
         Solver<TestdataSolution> solver = solverFactory.buildSolver();
 
@@ -82,6 +87,7 @@ public class DefaultSolverTest {
         solution = solver.solve(solution);
         assertNotNull(solution);
         assertEquals(false, solution.getScore().isSolutionInitialized());
+        assertSame(solution, solver.getBestSolution());
     }
 
     @Test
@@ -89,9 +95,8 @@ public class DefaultSolverTest {
         SolverFactory<TestdataSolution> solverFactory = PlannerTestUtils.buildSolverFactory(
                 TestdataSolution.class, TestdataEntity.class);
         ConstructionHeuristicPhaseConfig phaseConfig = new ConstructionHeuristicPhaseConfig();
-        TerminationConfig terminationConfig = new TerminationConfig();
-        terminationConfig.setStepCountLimit(2); // Run only 2 steps, although 5 are needed to initialize all entities
-        phaseConfig.setTerminationConfig(terminationConfig);
+        // Run only 2 steps, although 5 are needed to initialize all entities
+        phaseConfig.setTerminationConfig(new TerminationConfig().withStepCountLimit(2));
         solverFactory.getSolverConfig().setPhaseConfigList(Collections.singletonList(phaseConfig));
         Solver<TestdataSolution> solver = solverFactory.buildSolver();
 
@@ -103,6 +108,7 @@ public class DefaultSolverTest {
         solution = solver.solve(solution);
         assertNotNull(solution);
         assertEquals(false, solution.getScore().isSolutionInitialized());
+        assertSame(solution, solver.getBestSolution());
     }
 
 }

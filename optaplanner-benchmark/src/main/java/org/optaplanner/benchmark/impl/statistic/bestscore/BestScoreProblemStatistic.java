@@ -82,6 +82,9 @@ public class BestScoreProblemStatistic extends ProblemStatistic {
                         singleBenchmarkResult.getSubSingleStatistic(problemStatisticType);
                 List<BestScoreStatisticPoint> points = subSingleStatistic.getPointList();
                 for (BestScoreStatisticPoint point : points) {
+                    if (!point.getScore().isSolutionInitialized()) {
+                        continue;
+                    }
                     long timeMillisSpent = point.getTimeMillisSpent();
                     double[] levelValues = ScoreUtils.extractLevelDoubles(point.getScore());
                     for (int i = 0; i < levelValues.length && i < BenchmarkReport.CHARTED_SCORE_LEVEL_SIZE; i++) {
@@ -123,8 +126,9 @@ public class BestScoreProblemStatistic extends ProblemStatistic {
         }
         graphFileList = new ArrayList<>(plotList.size());
         for (int scoreLevelIndex = 0; scoreLevelIndex < plotList.size(); scoreLevelIndex++) {
+            String scoreLevelLabel = problemBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
             JFreeChart chart = new JFreeChart(
-                    problemBenchmarkResult.getName() + " best score level " + scoreLevelIndex + " statistic",
+                    problemBenchmarkResult.getName() + " best " + scoreLevelLabel + " statistic",
                     JFreeChart.DEFAULT_TITLE_FONT, plotList.get(scoreLevelIndex), true);
             graphFileList.add(writeChartToImageFile(chart,
                     problemBenchmarkResult.getName() + "BestScoreStatisticLevel" + scoreLevelIndex));
@@ -135,7 +139,8 @@ public class BestScoreProblemStatistic extends ProblemStatistic {
         Locale locale = benchmarkReport.getLocale();
         NumberAxis xAxis = new NumberAxis("Time spent");
         xAxis.setNumberFormatOverride(new MillisecondsSpentNumberFormat(locale));
-        NumberAxis yAxis = new NumberAxis("Best score level " + scoreLevelIndex);
+        String scoreLevelLabel = problemBenchmarkResult.findScoreLevelLabel(scoreLevelIndex);
+        NumberAxis yAxis = new NumberAxis("Best " + scoreLevelLabel);
         yAxis.setNumberFormatOverride(NumberFormat.getInstance(locale));
         yAxis.setAutoRangeIncludesZero(false);
         XYPlot plot = new XYPlot(null, xAxis, yAxis, null);

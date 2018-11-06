@@ -17,11 +17,11 @@
 package org.optaplanner.examples.nurserostering.solver.drools;
 
 import java.io.Serializable;
+import java.time.DayOfWeek;
 
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.optaplanner.examples.nurserostering.domain.DayOfWeek;
 import org.optaplanner.examples.nurserostering.domain.Employee;
 import org.optaplanner.examples.nurserostering.domain.ShiftDate;
 import org.optaplanner.examples.nurserostering.domain.WeekendDefinition;
@@ -53,6 +53,7 @@ public class EmployeeConsecutiveAssignmentEnd implements Comparable<EmployeeCons
         this.shiftDate = shiftDate;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -67,6 +68,7 @@ public class EmployeeConsecutiveAssignmentEnd implements Comparable<EmployeeCons
         }
     }
 
+    @Override
     public int hashCode() {
         return new HashCodeBuilder()
                 .append(employee)
@@ -104,7 +106,12 @@ public class EmployeeConsecutiveAssignmentEnd implements Comparable<EmployeeCons
     public int getDistanceToLastDayOfWeekend() {
         WeekendDefinition weekendDefinition = employee.getContract().getWeekendDefinition();
         DayOfWeek dayOfWeek = shiftDate.getDayOfWeek();
-        return dayOfWeek.getDistanceToNext(weekendDefinition.getLastDayOfWeekend());
+        DayOfWeek lastDayOfWeekend = weekendDefinition.getLastDayOfWeekend();
+        int distance = lastDayOfWeekend.getValue() - dayOfWeek.getValue();
+        if (distance < 0) {
+            distance += 7;
+        }
+        return distance;
     }
 
 }

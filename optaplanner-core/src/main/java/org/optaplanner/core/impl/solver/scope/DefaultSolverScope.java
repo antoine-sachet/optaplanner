@@ -18,13 +18,17 @@ package org.optaplanner.core.impl.solver.scope;
 
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.score.Score;
+import org.optaplanner.core.api.solver.Solver;
 import org.optaplanner.core.impl.domain.solution.descriptor.SolutionDescriptor;
-import org.optaplanner.core.impl.score.ScoreUtils;
+import org.optaplanner.core.impl.phase.scope.AbstractPhaseScope;
 import org.optaplanner.core.impl.score.definition.ScoreDefinition;
 import org.optaplanner.core.impl.score.director.InnerScoreDirector;
+import org.optaplanner.core.impl.solver.ChildThreadType;
+import org.optaplanner.core.impl.solver.termination.Termination;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,16 +42,24 @@ public class DefaultSolverScope<Solution_> {
     protected int startingSolverCount;
     protected Random workingRandom;
     protected InnerScoreDirector<Solution_> scoreDirector;
+    /**
+     * Used for capping CPU power usage in multithreaded scenarios.
+     */
+    protected Semaphore runnableThreadSemaphore = null;
 
-    protected Long startingSystemTimeMillis;
-    protected Long endingSystemTimeMillis;
+    protected volatile Long startingSystemTimeMillis;
+    protected volatile Long endingSystemTimeMillis;
+    protected long childThreadsScoreCalculationCount = 0;
 
-    protected Score startingInitializedScore; // TODO after initialization => ambiguous with solve()'s planningProblem
+    protected Score startingInitializedScore;
 
     protected volatile Solution_ bestSolution;
-    protected volatile Score bestScore; // TODO remove me by folding me into bestSolution.getScore()?
+    protected volatile Score bestScore;
     protected Long bestSolutionTimeMillis;
 
+    // ************************************************************************
+    // Constructors and simple getters/setters
+    // ************************************************************************
 
     public int getStartingSolverCount() {
         return startingSolverCount;
@@ -71,6 +83,10 @@ public class DefaultSolverScope<Solution_> {
 
     public void setScoreDirector(InnerScoreDirector<Solution_> scoreDirector) {
         this.scoreDirector = scoreDirector;
+    }
+
+    public void setRunnableThreadSemaphore(Semaphore runnableThreadSemaphore) {
+        this.runnableThreadSemaphore = runnableThreadSemaphore;
     }
 
     public Long getStartingSystemTimeMillis() {
@@ -109,20 +125,8 @@ public class DefaultSolverScope<Solution_> {
         return scoreDirector.calculateScore();
     }
 
-    public void assertExpectedWorkingScore(Score expectedWorkingScore, Object completedAction) {
-        scoreDirector.assertExpectedWorkingScore(expectedWorkingScore, completedAction);
-    }
-
-    public void assertWorkingScoreFromScratch(Score workingScore, Object completedAction) {
-        scoreDirector.assertWorkingScoreFromScratch(workingScore, completedAction);
-    }
-
     public void assertScoreFromScratch(Solution_ solution) {
         scoreDirector.getScoreDirectorFactory().assertScoreFromScratch(solution);
-    }
-
-    public void assertShadowVariablesAreNotStale(Score workingScore, Object completedAction) {
-        scoreDirector.assertShadowVariablesAreNotStale(workingScore, completedAction);
     }
 
     public Score getStartingInitializedScore() {
@@ -133,8 +137,12 @@ public class DefaultSolverScope<Solution_> {
         this.startingInitializedScore = startingInitializedScore;
     }
 
+    public void addChildThreadsScoreCalculationCount(long addition) {
+        childThreadsScoreCalculationCount += addition;
+    }
+
     public long getScoreCalculationCount() {
-        return scoreDirector.getCalculationCount();
+        return scoreDirector.getCalculationCount() + childThreadsScoreCalculationCount;
     }
 
     public Solution_ getBestSolution() {
@@ -175,6 +183,10 @@ public class DefaultSolverScope<Solution_> {
         endingSystemTimeMillis = null;
     }
 
+    public Long getBestSolutionTimeMillisSpent() {
+        return bestSolutionTimeMillis - startingSystemTimeMillis;
+    }
+
     public void endingNow() {
         endingSystemTimeMillis = System.currentTimeMillis();
     }
@@ -204,6 +216,61 @@ public class DefaultSolverScope<Solution_> {
     public void setWorkingSolutionFromBestSolution() {
         // The workingSolution must never be the same instance as the bestSolution.
         scoreDirector.setWorkingSolution(scoreDirector.cloneSolution(bestSolution));
+    }
+
+    public DefaultSolverScope<Solution_> createChildThreadSolverScope(ChildThreadType childThreadType) {
+        DefaultSolverScope<Solution_> childThreadSolverScope = new DefaultSolverScope<>();
+        childThreadSolverScope.startingSolverCount = startingSolverCount;
+        // TODO FIXME use RandomFactory
+        // Experiments show that this trick to attain reproducibility doesn't break uniform distribution
+        childThreadSolverScope.workingRandom = new Random(workingRandom.nextLong());
+        childThreadSolverScope.scoreDirector = scoreDirector.createChildThreadScoreDirector(childThreadType);
+        childThreadSolverScope.startingSystemTimeMillis = startingSystemTimeMillis;
+        childThreadSolverScope.endingSystemTimeMillis = endingSystemTimeMillis;
+        childThreadSolverScope.startingInitializedScore = null;
+        childThreadSolverScope.bestSolution = null;
+        childThreadSolverScope.bestScore = null;
+        childThreadSolverScope.bestSolutionTimeMillis = null;
+        return childThreadSolverScope;
+    }
+
+    public void initializeYielding() {
+        if (runnableThreadSemaphore != null) {
+            try {
+                runnableThreadSemaphore.acquire();
+            } catch (InterruptedException e) {
+                // TODO it will take a while before the BasicPlumbingTermination is called
+                // The BasicPlumbingTermination will terminate the solver.
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
+     * Similar to {@link Thread#yield()}, but allows capping the number of active solver threads
+     * at less than the CPU processor count, so other threads (for example servlet threads that handle REST calls)
+     * and other processes (such as SSH) have access to uncontested CPUs and don't suffer any latency.
+     * <p>
+     * Needs to be called <b>before</b> {@link Termination#isPhaseTerminated(AbstractPhaseScope)},
+     * so the decision to start a new iteration is after any yield waiting time has been consumed
+     * (so {@link Solver#terminateEarly()} reacts immediately).
+     */
+    public void checkYielding() {
+        if (runnableThreadSemaphore != null) {
+            runnableThreadSemaphore.release();
+            try {
+                runnableThreadSemaphore.acquire();
+            } catch (InterruptedException e) {
+                // The BasicPlumbingTermination will terminate the solver.
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public void destroyYielding() {
+        if (runnableThreadSemaphore != null) {
+            runnableThreadSemaphore.release();
+        }
     }
 
 }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plannerBenchmark>
   <benchmarkDirectory>local/data/nurserostering/stepLimit</benchmarkDirectory>
+  <warmUpSecondsSpentLimit>0</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -13,7 +14,6 @@
       <solutionClass>org.optaplanner.examples.nurserostering.domain.NurseRoster</solutionClass>
       <entityClass>org.optaplanner.examples.nurserostering.domain.ShiftAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/nurserostering/solver/nurseRosteringScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
     </solver>

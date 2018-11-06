@@ -32,11 +32,13 @@ import java.util.List;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.XStreamException;
 import com.thoughtworks.xstream.converters.ConversionException;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.optaplanner.benchmark.impl.statistic.ProblemStatistic;
 import org.optaplanner.benchmark.impl.statistic.PureSubSingleStatistic;
+import org.optaplanner.core.config.SolverConfigContext;
+import org.optaplanner.core.config.solver.SolverConfig;
 import org.optaplanner.core.impl.solver.XStreamXmlSolverFactory;
+import org.optaplanner.persistence.xstream.api.score.AbstractScoreXStreamConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,74 +53,65 @@ public class BenchmarkResultIO {
     public BenchmarkResultIO() {
         xStream = XStreamXmlSolverFactory.buildXStream();
         xStream.processAnnotations(PlannerBenchmarkResult.class);
+        xStream.allowTypesByRegExp(new String[]{"org\\.optaplanner\\.\\w+\\.api\\..*"});
+        xStream.allowTypesByRegExp(new String[]{"org\\.optaplanner\\.\\w+\\.impl\\..*"});
+        AbstractScoreXStreamConverter.registerScoreConverters(xStream);
     }
 
     public void writePlannerBenchmarkResult(File benchmarkReportDirectory,
             PlannerBenchmarkResult plannerBenchmarkResult) {
         File plannerBenchmarkResultFile = new File(benchmarkReportDirectory, PLANNER_BENCHMARK_RESULT_FILENAME);
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(new FileOutputStream(plannerBenchmarkResultFile), "UTF-8");
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(plannerBenchmarkResultFile), "UTF-8")) {
             xStream.toXML(plannerBenchmarkResult, writer);
         } catch (IOException e) {
             throw new IllegalArgumentException(
-                    "Problem writing plannerBenchmarkResultFile: " + plannerBenchmarkResultFile, e);
-        } finally {
-            IOUtils.closeQuietly(writer);
+                    "Failed writing plannerBenchmarkResultFile (" + plannerBenchmarkResultFile + ").", e);
         }
     }
 
-    public List<PlannerBenchmarkResult> readPlannerBenchmarkResultList(File benchmarkDirectory) {
-        if (!benchmarkDirectory.exists()) {
+    public List<PlannerBenchmarkResult> readPlannerBenchmarkResultList(SolverConfigContext configContext, File benchmarkDirectory) {
+        if (!benchmarkDirectory.exists() || !benchmarkDirectory.isDirectory()) {
             throw new IllegalArgumentException("The benchmarkDirectory (" + benchmarkDirectory
-                    + ") does not exist.");
-        }
-        if (!benchmarkDirectory.isDirectory()) {
-            throw new IllegalArgumentException("The benchmarkDirectory (" + benchmarkDirectory
-                    + ") is not a directory.");
+                    + ") does not exist or is not a directory.");
         }
         File[] benchmarkReportDirectories = benchmarkDirectory.listFiles((FileFilter) DirectoryFileFilter.INSTANCE);
+        if (benchmarkReportDirectories == null) {
+            throw new IllegalStateException("Unable to list the subdirectories in the benchmarkDirectory ("
+                    + benchmarkDirectory.getAbsolutePath() + ").");
+        }
         Arrays.sort(benchmarkReportDirectories);
-        List<PlannerBenchmarkResult> plannerBenchmarkResultList = new ArrayList<>(
-                benchmarkReportDirectories.length);
+        List<PlannerBenchmarkResult> plannerBenchmarkResultList = new ArrayList<>(benchmarkReportDirectories.length);
         for (File benchmarkReportDirectory : benchmarkReportDirectories) {
             File plannerBenchmarkResultFile = new File(benchmarkReportDirectory, PLANNER_BENCHMARK_RESULT_FILENAME);
             if (plannerBenchmarkResultFile.exists()) {
-                PlannerBenchmarkResult plannerBenchmarkResult = readPlannerBenchmarkResult(plannerBenchmarkResultFile);
+                PlannerBenchmarkResult plannerBenchmarkResult = readPlannerBenchmarkResult(configContext, plannerBenchmarkResultFile);
                 plannerBenchmarkResultList.add(plannerBenchmarkResult);
             }
         }
         return plannerBenchmarkResultList;
     }
 
-    protected PlannerBenchmarkResult readPlannerBenchmarkResult(File plannerBenchmarkResultFile) {
+    protected PlannerBenchmarkResult readPlannerBenchmarkResult(SolverConfigContext configContext, File plannerBenchmarkResultFile) {
         if (!plannerBenchmarkResultFile.exists()) {
             throw new IllegalArgumentException("The plannerBenchmarkResultFile (" + plannerBenchmarkResultFile
                     + ") does not exist.");
         }
         PlannerBenchmarkResult plannerBenchmarkResult;
-        Reader reader = null;
-        try {
-            reader = new InputStreamReader(new FileInputStream(plannerBenchmarkResultFile), "UTF-8");
+        try (Reader reader = new InputStreamReader(new FileInputStream(plannerBenchmarkResultFile), "UTF-8")) {
             plannerBenchmarkResult = (PlannerBenchmarkResult) xStream.fromXML(reader);
         } catch (ConversionException e) {
-            logger.warn(
-                    "Problem reading plannerBenchmarkResultFile (" + plannerBenchmarkResultFile + ").", e);
+            logger.warn("Failed reading plannerBenchmarkResultFile ({}).", plannerBenchmarkResultFile, e);
             // If the plannerBenchmarkResultFile's format has changed, the app should not crash entirely
             String benchmarkReportDirectoryName = plannerBenchmarkResultFile.getParentFile().getName();
             plannerBenchmarkResult = PlannerBenchmarkResult.createUnmarshallingFailedResult(
                     benchmarkReportDirectoryName);
-        } catch (XStreamException e) {
+        } catch (XStreamException | IOException e) {
             throw new IllegalArgumentException(
-                    "Problem reading plannerBenchmarkResultFile (" + plannerBenchmarkResultFile + ").", e);
-        } catch (IOException e) {
-            throw new IllegalArgumentException(
-                    "Problem reading plannerBenchmarkResultFile (" + plannerBenchmarkResultFile + ").", e);
-        } finally {
-            IOUtils.closeQuietly(reader);
+                    "Failed reading plannerBenchmarkResultFile (" + plannerBenchmarkResultFile + ").", e);
         }
         plannerBenchmarkResult.setBenchmarkReportDirectory(plannerBenchmarkResultFile.getParentFile());
         restoreOmittedBidirectionalFields(plannerBenchmarkResult);
+        restoreOtherOmittedFields(configContext, plannerBenchmarkResult);
         return plannerBenchmarkResult;
     }
 
@@ -150,6 +143,14 @@ public class BenchmarkResultIO {
                     }
                 }
             }
+        }
+    }
+
+    private void restoreOtherOmittedFields(SolverConfigContext configContext, PlannerBenchmarkResult plannerBenchmarkResult) {
+        for (SolverBenchmarkResult solverBenchmarkResult : plannerBenchmarkResult.getSolverBenchmarkResultList()) {
+            SolverConfig solverConfig = solverBenchmarkResult.getSolverConfig();
+            solverBenchmarkResult.setScoreDefinition(
+                    solverConfig.buildSolutionDescriptor(configContext).getScoreDefinition());
         }
     }
 

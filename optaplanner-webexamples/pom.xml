@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.optaplanner</groupId>
     <artifactId>optaplanner</artifactId>
-    <version>7.0.0-SNAPSHOT</version>
+    <version>7.14.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>optaplanner-webexamples</artifactId>
@@ -20,12 +20,10 @@
 
     This module contains the web examples which demonstrate how to use it in a war file.
   </description>
+  <url>https://www.optaplanner.org</url>
 
   <properties>
-    <!-- Overwrite ip-bom's jboss-logging version of EAP 6.4 to allow Arquillian test to work on WildFly 9 -->
-    <version.org.jboss.logging.jboss-logging>3.2.1.Final</version.org.jboss.logging.jboss-logging>
-    <version.org.wildfly>10.0.0.Final</version.org.wildfly>
-    <version.org.wildfly.arquillian.container>1.0.0.Final</version.org.wildfly.arquillian.container>
+    <version.org.wildfly>14.0.1.Final</version.org.wildfly>
   </properties>
   <build>
     <testResources>
@@ -62,21 +60,6 @@
     </plugins>
   </build>
 
-  <dependencyManagement>
-    <dependencies>
-      <!-- Overwrite ip-bom's jboss-logging version of EAP 6.4 to allow Arquillian test to work on WildFly 10 -->
-      <dependency>
-        <groupId>org.jboss.logging</groupId>
-        <artifactId>jboss-logging</artifactId>
-        <version>${version.org.jboss.logging.jboss-logging}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.wildfly.arquillian</groupId>
-        <artifactId>wildfly-arquillian-container-managed</artifactId>
-        <version>${version.org.wildfly.arquillian.container}</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
   <dependencies>
     <!-- Internal dependencies -->
     <dependency>
@@ -108,32 +91,49 @@
       <scope>runtime</scope>
     </dependency>
 
-    <!-- TODO Use javaee-api instead of the individual APi's below -->
+    <!--
+      TODO Use javaee-api instead of the individual APi's below
+      It works, but the enforcer plugin doesn't like arquillian depends on individual jars
+      which causes including the same class twice from different jars (in the test scope only).
+    -->
     <!--<dependency>-->
-      <!--<groupId>javax</groupId>-->
-      <!--<artifactId>javaee-api</artifactId>-->
-      <!--<version>6.0</version>-->
-      <!--<scope>provided</scope>-->
+    <!--<groupId>javax</groupId>-->
+    <!--<artifactId>javaee-api</artifactId>-->
+    <!--<version>7.0</version>-->
+    <!--<scope>provided</scope>-->
     <!--</dependency>-->
     <dependency>
+      <groupId>org.jboss.spec.javax.annotation</groupId>
+      <artifactId>jboss-annotations-api_1.2_spec</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.jboss.spec.javax.servlet</groupId>
-      <artifactId>jboss-servlet-api_3.0_spec</artifactId>
+      <artifactId>jboss-servlet-api_3.1_spec</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.jboss.spec.javax.servlet.jsp</groupId>
-      <artifactId>jboss-jsp-api_2.2_spec</artifactId>
+      <artifactId>jboss-jsp-api_2.3_spec</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.jboss.spec.javax.ws.rs</groupId>
-      <artifactId>jboss-jaxrs-api_1.1_spec</artifactId>
+      <artifactId>jboss-jaxrs-api_2.0_spec</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>javax.enterprise</groupId>
       <artifactId>cdi-api</artifactId>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <!-- Collides with 'org.jboss.spec.javax.el:jboss-el-api_3.0_spec' brought in by
+               'org.jboss.spec.javax.servlet.jsp:jboss-jsp-api_2.3_spec'. -->
+          <groupId>javax.el</groupId>
+          <artifactId>javax.el-api</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- Tests -->
@@ -157,6 +157,18 @@
       <groupId>org.jboss.resteasy</groupId>
       <artifactId>resteasy-jaxrs</artifactId>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- Collides with 'com.google.code.findbugs:annotations' brought in by
+               optaplanner-core via 'org.reflections:reflections'. -->
+          <groupId>net.jcip</groupId>
+          <artifactId>jcip-annotations</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.jboss.resteasy</groupId>

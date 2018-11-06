@@ -26,15 +26,36 @@ import static org.junit.Assert.*;
 public class HardSoftScoreTest extends AbstractScoreTest {
 
     @Test
+    public void of() {
+        assertEquals(HardSoftScore.of(-147, 0),
+                HardSoftScore.ofHard(-147));
+        assertEquals(HardSoftScore.of(0, -258),
+                HardSoftScore.ofSoft(-258));
+    }
+
+    @Test
     public void parseScore() {
-        assertEquals(HardSoftScore.valueOfInitialized(-147, -258), HardSoftScore.parseScore("-147hard/-258soft"));
-        assertEquals(HardSoftScore.valueOf(-7, -147, -258), HardSoftScore.parseScore("-7init/-147hard/-258soft"));
+        assertEquals(HardSoftScore.of(-147, -258), HardSoftScore.parseScore("-147hard/-258soft"));
+        assertEquals(HardSoftScore.ofUninitialized(-7, -147, -258), HardSoftScore.parseScore("-7init/-147hard/-258soft"));
+        assertEquals(HardSoftScore.of(-147, Integer.MIN_VALUE), HardSoftScore.parseScore("-147hard/*soft"));
+    }
+
+    @Test
+    public void toShortString() {
+        assertEquals("0", HardSoftScore.of(0, 0).toShortString());
+        assertEquals("-258soft", HardSoftScore.of(0, -258).toShortString());
+        assertEquals("-147hard", HardSoftScore.of(-147, 0).toShortString());
+        assertEquals("-147hard/-258soft", HardSoftScore.of(-147, -258).toShortString());
+        assertEquals("-7init", HardSoftScore.ofUninitialized(-7, 0, 0).toShortString());
+        assertEquals("-7init/-258soft", HardSoftScore.ofUninitialized(-7, 0, -258).toShortString());
+        assertEquals("-7init/-147hard/-258soft", HardSoftScore.ofUninitialized(-7, -147, -258).toShortString());
     }
 
     @Test
     public void testToString() {
-        assertEquals("-147hard/-258soft", HardSoftScore.valueOfInitialized(-147, -258).toString());
-        assertEquals("-7init/-147hard/-258soft", HardSoftScore.valueOf(-7, -147, -258).toString());
+        assertEquals("0hard/-258soft", HardSoftScore.of(0, -258).toString());
+        assertEquals("-147hard/-258soft", HardSoftScore.of(-147, -258).toString());
+        assertEquals("-7init/-147hard/-258soft", HardSoftScore.ofUninitialized(-7, -147, -258).toString());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -44,129 +65,135 @@ public class HardSoftScoreTest extends AbstractScoreTest {
 
     @Test
     public void toInitializedScore() {
-        assertEquals(HardSoftScore.valueOfInitialized(-147, -258),
-                HardSoftScore.valueOfInitialized(-147, -258).toInitializedScore());
-        assertEquals(HardSoftScore.valueOfInitialized(-147, -258),
-                HardSoftScore.valueOf(-7, -147, -258).toInitializedScore());
+        assertEquals(HardSoftScore.of(-147, -258),
+                HardSoftScore.of(-147, -258).toInitializedScore());
+        assertEquals(HardSoftScore.of(-147, -258),
+                HardSoftScore.ofUninitialized(-7, -147, -258).toInitializedScore());
+    }
+
+    @Test
+    public void withInitScore() {
+        assertEquals(HardSoftScore.ofUninitialized(-7, -147, -258),
+                HardSoftScore.of(-147, -258).withInitScore(-7));
     }
 
     @Test
     public void feasible() {
         assertScoreNotFeasible(
-                HardSoftScore.valueOfInitialized(-5, -300),
-                HardSoftScore.valueOf(-7, -5, -300),
-                HardSoftScore.valueOf(-7, 0, -300)
+                HardSoftScore.of(-5, -300),
+                HardSoftScore.ofUninitialized(-7, -5, -300),
+                HardSoftScore.ofUninitialized(-7, 0, -300)
         );
         assertScoreFeasible(
-                HardSoftScore.valueOfInitialized(0, -300),
-                HardSoftScore.valueOfInitialized(2, -300),
-                HardSoftScore.valueOf(0, 0, -300)
+                HardSoftScore.of(0, -300),
+                HardSoftScore.of(2, -300),
+                HardSoftScore.ofUninitialized(0, 0, -300)
         );
     }
 
     @Test
     public void add() {
-        assertEquals(HardSoftScore.valueOfInitialized(19, -320),
-                HardSoftScore.valueOfInitialized(20, -20).add(
-                        HardSoftScore.valueOfInitialized(-1, -300)));
-        assertEquals(HardSoftScore.valueOf(-77, 19, -320),
-                HardSoftScore.valueOf(-70, 20, -20).add(
-                        HardSoftScore.valueOf(-7, -1, -300)));
+        assertEquals(HardSoftScore.of(19, -320),
+                HardSoftScore.of(20, -20).add(
+                        HardSoftScore.of(-1, -300)));
+        assertEquals(HardSoftScore.ofUninitialized(-77, 19, -320),
+                HardSoftScore.ofUninitialized(-70, 20, -20).add(
+                        HardSoftScore.ofUninitialized(-7, -1, -300)));
     }
 
     @Test
     public void subtract() {
-        assertEquals(HardSoftScore.valueOfInitialized(21, 280),
-                HardSoftScore.valueOfInitialized(20, -20).subtract(
-                        HardSoftScore.valueOfInitialized(-1, -300)));
-        assertEquals(HardSoftScore.valueOf(-63, 21, 280),
-                HardSoftScore.valueOf(-70, 20, -20).subtract(
-                        HardSoftScore.valueOf(-7, -1, -300)));
+        assertEquals(HardSoftScore.of(21, 280),
+                HardSoftScore.of(20, -20).subtract(
+                        HardSoftScore.of(-1, -300)));
+        assertEquals(HardSoftScore.ofUninitialized(-63, 21, 280),
+                HardSoftScore.ofUninitialized(-70, 20, -20).subtract(
+                        HardSoftScore.ofUninitialized(-7, -1, -300)));
     }
 
     @Test
     public void multiply() {
-        assertEquals(HardSoftScore.valueOfInitialized(6, -6),
-                HardSoftScore.valueOfInitialized(5, -5).multiply(1.2));
-        assertEquals(HardSoftScore.valueOfInitialized(1, -2),
-                HardSoftScore.valueOfInitialized(1, -1).multiply(1.2));
-        assertEquals(HardSoftScore.valueOfInitialized(4, -5),
-                HardSoftScore.valueOfInitialized(4, -4).multiply(1.2));
-        assertEquals(HardSoftScore.valueOf(-14, 8, -10),
-                HardSoftScore.valueOf(-7, 4, -5).multiply(2.0));
+        assertEquals(HardSoftScore.of(6, -6),
+                HardSoftScore.of(5, -5).multiply(1.2));
+        assertEquals(HardSoftScore.of(1, -2),
+                HardSoftScore.of(1, -1).multiply(1.2));
+        assertEquals(HardSoftScore.of(4, -5),
+                HardSoftScore.of(4, -4).multiply(1.2));
+        assertEquals(HardSoftScore.ofUninitialized(-14, 8, -10),
+                HardSoftScore.ofUninitialized(-7, 4, -5).multiply(2.0));
     }
 
     @Test
     public void divide() {
-        assertEquals(HardSoftScore.valueOfInitialized(5, -5),
-                HardSoftScore.valueOfInitialized(25, -25).divide(5.0));
-        assertEquals(HardSoftScore.valueOfInitialized(4, -5),
-                HardSoftScore.valueOfInitialized(21, -21).divide(5.0));
-        assertEquals(HardSoftScore.valueOfInitialized(4, -5),
-                HardSoftScore.valueOfInitialized(24, -24).divide(5.0));
-        assertEquals(HardSoftScore.valueOf(-7, 4, -5),
-                HardSoftScore.valueOf(-14, 8, -10).divide(2.0));
+        assertEquals(HardSoftScore.of(5, -5),
+                HardSoftScore.of(25, -25).divide(5.0));
+        assertEquals(HardSoftScore.of(4, -5),
+                HardSoftScore.of(21, -21).divide(5.0));
+        assertEquals(HardSoftScore.of(4, -5),
+                HardSoftScore.of(24, -24).divide(5.0));
+        assertEquals(HardSoftScore.ofUninitialized(-7, 4, -5),
+                HardSoftScore.ofUninitialized(-14, 8, -10).divide(2.0));
     }
 
     @Test
     public void power() {
-        assertEquals(HardSoftScore.valueOfInitialized(16, 25),
-                HardSoftScore.valueOfInitialized(-4, 5).power(2.0));
-        assertEquals(HardSoftScore.valueOfInitialized(4, 5),
-                HardSoftScore.valueOfInitialized(16, 25).power(0.5));
-        assertEquals(HardSoftScore.valueOf(-343, 64, 125),
-                HardSoftScore.valueOf(-7, 4, 5).power(3.0));
+        assertEquals(HardSoftScore.of(16, 25),
+                HardSoftScore.of(-4, 5).power(2.0));
+        assertEquals(HardSoftScore.of(4, 5),
+                HardSoftScore.of(16, 25).power(0.5));
+        assertEquals(HardSoftScore.ofUninitialized(-343, 64, 125),
+                HardSoftScore.ofUninitialized(-7, 4, 5).power(3.0));
     }
 
     @Test
     public void negate() {
-        assertEquals(HardSoftScore.valueOfInitialized(4, -5),
-                HardSoftScore.valueOfInitialized(-4, 5).negate());
-        assertEquals(HardSoftScore.valueOfInitialized(-4, 5),
-                HardSoftScore.valueOfInitialized(4, -5).negate());
+        assertEquals(HardSoftScore.of(4, -5),
+                HardSoftScore.of(-4, 5).negate());
+        assertEquals(HardSoftScore.of(-4, 5),
+                HardSoftScore.of(4, -5).negate());
     }
 
     @Test
     public void equalsAndHashCode() {
-        assertScoresEqualsAndHashCode(
-                HardSoftScore.valueOfInitialized(-10, -200),
-                HardSoftScore.valueOfInitialized(-10, -200),
-                HardSoftScore.valueOf(0, -10, -200)
+        PlannerAssert.assertObjectsAreEqual(
+                HardSoftScore.of(-10, -200),
+                HardSoftScore.of(-10, -200),
+                HardSoftScore.ofUninitialized(0, -10, -200)
         );
-        assertScoresEqualsAndHashCode(
-                HardSoftScore.valueOf(-7, -10, -200),
-                HardSoftScore.valueOf(-7, -10, -200)
+        PlannerAssert.assertObjectsAreEqual(
+                HardSoftScore.ofUninitialized(-7, -10, -200),
+                HardSoftScore.ofUninitialized(-7, -10, -200)
         );
-        assertScoresNotEquals(
-                HardSoftScore.valueOfInitialized(-10, -200),
-                HardSoftScore.valueOfInitialized(-30, -200),
-                HardSoftScore.valueOfInitialized(-10, -400),
-                HardSoftScore.valueOf(-7, -10, -200)
+        PlannerAssert.assertObjectsAreNotEqual(
+                HardSoftScore.of(-10, -200),
+                HardSoftScore.of(-30, -200),
+                HardSoftScore.of(-10, -400),
+                HardSoftScore.ofUninitialized(-7, -10, -200)
         );
     }
 
     @Test
     public void compareTo() {
         PlannerAssert.assertCompareToOrder(
-                HardSoftScore.valueOf(-8, 0, 0),
-                HardSoftScore.valueOf(-7, -20, -20),
-                HardSoftScore.valueOf(-7, -1, -300),
-                HardSoftScore.valueOf(-7, 0, 0),
-                HardSoftScore.valueOf(-7, 0, 1),
-                HardSoftScore.valueOfInitialized(-20, Integer.MIN_VALUE),
-                HardSoftScore.valueOfInitialized(-20, -20),
-                HardSoftScore.valueOfInitialized(-1, -300),
-                HardSoftScore.valueOfInitialized(-1, 4000),
-                HardSoftScore.valueOfInitialized(0, -1),
-                HardSoftScore.valueOfInitialized(0, 0),
-                HardSoftScore.valueOfInitialized(0, 1)
+                HardSoftScore.ofUninitialized(-8, 0, 0),
+                HardSoftScore.ofUninitialized(-7, -20, -20),
+                HardSoftScore.ofUninitialized(-7, -1, -300),
+                HardSoftScore.ofUninitialized(-7, 0, 0),
+                HardSoftScore.ofUninitialized(-7, 0, 1),
+                HardSoftScore.of(-20, Integer.MIN_VALUE),
+                HardSoftScore.of(-20, -20),
+                HardSoftScore.of(-1, -300),
+                HardSoftScore.of(-1, 4000),
+                HardSoftScore.of(0, -1),
+                HardSoftScore.of(0, 0),
+                HardSoftScore.of(0, 1)
         );
     }
 
     @Test
     public void serializeAndDeserialize() {
         PlannerTestUtils.serializeAndDeserializeWithAll(
-                HardSoftScore.valueOfInitialized(-12, 3400),
+                HardSoftScore.of(-12, 3400),
                 output -> {
                     assertEquals(0, output.getInitScore());
                     assertEquals(-12, output.getHardScore());
@@ -174,7 +201,7 @@ public class HardSoftScoreTest extends AbstractScoreTest {
                 }
         );
         PlannerTestUtils.serializeAndDeserializeWithAll(
-                HardSoftScore.valueOf(-7, -12, 3400),
+                HardSoftScore.ofUninitialized(-7, -12, 3400),
                 output -> {
                     assertEquals(-7, output.getInitScore());
                     assertEquals(-12, output.getHardScore());

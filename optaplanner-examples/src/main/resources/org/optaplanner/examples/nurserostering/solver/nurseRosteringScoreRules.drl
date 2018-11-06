@@ -19,7 +19,7 @@ package org.optaplanner.examples.nurserostering.solver;
 
 import org.optaplanner.core.api.score.buildin.hardsoft.HardSoftScoreHolder;
 
-import org.optaplanner.examples.nurserostering.domain.DayOfWeek;
+import java.time.DayOfWeek;
 import org.optaplanner.examples.nurserostering.domain.Employee;
 import org.optaplanner.examples.nurserostering.domain.ShiftAssignment;
 import org.optaplanner.examples.nurserostering.domain.NurseRoster;
@@ -46,7 +46,6 @@ import org.optaplanner.examples.nurserostering.domain.request.DayOffRequest;
 import org.optaplanner.examples.nurserostering.domain.request.DayOnRequest;
 import org.optaplanner.examples.nurserostering.domain.request.ShiftOffRequest;
 import org.optaplanner.examples.nurserostering.domain.request.ShiftOnRequest;
-import org.optaplanner.examples.nurserostering.solver.drools.EmployeeAssignmentTotal;
 import org.optaplanner.examples.nurserostering.solver.drools.EmployeeConsecutiveAssignmentEnd;
 import org.optaplanner.examples.nurserostering.solver.drools.EmployeeConsecutiveAssignmentStart;
 import org.optaplanner.examples.nurserostering.solver.drools.EmployeeConsecutiveWeekendAssignmentEnd;
@@ -74,46 +73,29 @@ end
 // Soft constraints
 // ############################################################################
 
-rule "insertEmployeeAssignmentTotal"
+rule "Minimum and maximum number of assignments"
         salience 1 // Do these rules first (optional, for performance)
     when
-        MinMaxContractLine(contractLineType == ContractLineType.TOTAL_ASSIGNMENTS, enabled == true,
+        $contractLine : MinMaxContractLine(contractLineType == ContractLineType.TOTAL_ASSIGNMENTS, enabled == true,
             $contract : contract)
         $employee : Employee(contract == $contract)
-        $assignmentTotal : Long() from accumulate(
-            $assignment : ShiftAssignment(employee == $employee),
-            count($assignment)
+        accumulate(
+            $assignment : ShiftAssignment(employee == $employee);
+            $total : count($assignment)
         )
     then
-        insertLogical(new EmployeeAssignmentTotal($employee, $assignmentTotal.intValue()));
+        int totalInt = $total.intValue();
+        if ($contractLine.isMinimumEnabled() && totalInt < $contractLine.getMinimumValue()) {
+            scoreHolder.addSoftConstraintMatch(kcontext,
+                    (totalInt - $contractLine.getMinimumValue()) * $contractLine.getMinimumWeight());
+        } else if ($contractLine.isMaximumEnabled() && totalInt > $contractLine.getMaximumValue()) {
+            scoreHolder.addSoftConstraintMatch(kcontext,
+                    ($contractLine.getMaximumValue() - totalInt) * $contractLine.getMaximumWeight());
+        } else {
+            // Workaround for https://issues.jboss.org/browse/PLANNER-761
+            scoreHolder.addSoftConstraintMatch(kcontext, 0);
+        }
 end
-
-// Minimum number of assignments
-rule "minimumTotalAssignments"
-    when
-        $contractLine : MinMaxContractLine(
-            contractLineType == ContractLineType.TOTAL_ASSIGNMENTS, minimumEnabled == true,
-            $contract : contract, $minimumValue : minimumValue
-        )
-        EmployeeAssignmentTotal(employeeContract == $contract, total < $minimumValue,
-            $employee : employee, $total : total)
-    then
-        scoreHolder.addSoftConstraintMatch(kcontext, ($total - $minimumValue) * $contractLine.getMinimumWeight());
-end
-
-// Maximum number of assignments
-rule "maximumTotalAssignments"
-    when
-        $contractLine : MinMaxContractLine(
-            contractLineType == ContractLineType.TOTAL_ASSIGNMENTS, maximumEnabled == true,
-            $contract : contract, $maximumValue : maximumValue
-        )
-        EmployeeAssignmentTotal(employeeContract == $contract, total > $maximumValue,
-            $employee : employee, $total : total)
-    then
-        scoreHolder.addSoftConstraintMatch(kcontext, ($maximumValue - $total) * $contractLine.getMaximumWeight());
-end
-
 
 rule "insertEmployeeConsecutiveAssignmentStart"
         salience 2 // Do these rules first (optional, for performance)
@@ -172,10 +154,9 @@ rule "minimumConsecutiveWorkingDays"
             contractLineType == ContractLineType.CONSECUTIVE_WORKING_DAYS, minimumEnabled == true,
             $contract : contract, $minimumValue : minimumValue
         )
-        $employee : Employee(contract == $contract)
 
         EmployeeWorkSequence(
-            employee == $employee,
+            getEmployee().getContract() == $contract,
             dayLength < $minimumValue,
             $dayLength : dayLength
         )
@@ -190,10 +171,9 @@ rule "maximumConsecutiveWorkingDays"
             contractLineType == ContractLineType.CONSECUTIVE_WORKING_DAYS, maximumEnabled == true,
             $contract : contract, $maximumValue : maximumValue
         )
-        $employee : Employee(contract == $contract)
 
         EmployeeWorkSequence(
-            employee == $employee,
+            getEmployee().getContract() == $contract,
             dayLength > $maximumValue,
             $dayLength : dayLength
         )
@@ -262,7 +242,7 @@ rule "insertEntireEmployeeFreeSequence"
         salience 1 // Do these rules first (optional, for performance)
     when
         $employee : Employee()
-        // There are no working days after the last day
+        // There are no working days at all
         not EmployeeConsecutiveAssignmentStart(
             employee == $employee
         )
@@ -278,10 +258,9 @@ rule "minimumConsecutiveFreeDays"
             contractLineType == ContractLineType.CONSECUTIVE_FREE_DAYS, minimumEnabled == true,
             $contract : contract, $minimumValue : minimumValue
         )
-        $employee : Employee(contract == $contract)
 
         EmployeeFreeSequence(
-            employee == $employee,
+            getEmployee().getContract() == $contract,
             dayLength < $minimumValue,
             $dayLength : dayLength
         )
@@ -296,10 +275,9 @@ rule "maximumConsecutiveFreeDays"
             contractLineType == ContractLineType.CONSECUTIVE_FREE_DAYS, maximumEnabled == true,
             $contract : contract, $maximumValue : maximumValue
         )
-        $employee : Employee(contract == $contract)
 
         EmployeeFreeSequence(
-            employee == $employee,
+            getEmployee().getContract() == $contract,
             dayLength > $maximumValue,
             $dayLength : dayLength
         )
@@ -372,10 +350,9 @@ rule "minimumConsecutiveWorkingWeekends"
             contractLineType == ContractLineType.CONSECUTIVE_WORKING_WEEKENDS, minimumEnabled == true,
             $contract : contract, $minimumValue : minimumValue
         )
-        $employee : Employee(contract == $contract)
 
         EmployeeWeekendSequence(
-            employee == $employee,
+            getEmployee().getContract() == $contract,
             weekendLength < $minimumValue,
             $weekendLength : weekendLength
         )
@@ -391,10 +368,9 @@ rule "maximumConsecutiveWorkingWeekends"
             contractLineType == ContractLineType.CONSECUTIVE_WORKING_WEEKENDS, maximumEnabled == true,
             $contract : contract, $maximumValue : maximumValue
         )
-        $employee : Employee(contract == $contract)
 
         EmployeeWeekendSequence(
-            employee == $employee,
+            getEmployee().getContract() == $contract,
             weekendLength > $maximumValue,
             $weekendLength : weekendLength
         )
@@ -442,13 +418,14 @@ rule "identicalShiftTypesDuringWeekend"
         $employee : Employee(contract == $contract, $weekendLength : weekendLength)
         ShiftDate(dayOfWeek == DayOfWeek.SUNDAY, $sundayIndex : dayIndex)
         $shiftType : ShiftType()
-        $weekendAssignmentTotal : Long(this > 0 && < $weekendLength) from accumulate(
+        accumulate(
             $assignment : ShiftAssignment(
                 weekend == true,
                 weekendSundayIndex == $sundayIndex,
                 employee == $employee,
-                shiftType == $shiftType),
-            count($assignment)
+                shiftType == $shiftType);
+            $weekendAssignmentTotal : count($assignment);
+            $weekendAssignmentTotal > 0 && $weekendAssignmentTotal < $weekendLength
         )
     then
         scoreHolder.addSoftConstraintMatch(kcontext,

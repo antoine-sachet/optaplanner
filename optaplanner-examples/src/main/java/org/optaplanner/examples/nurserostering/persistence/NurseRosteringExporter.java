@@ -17,9 +17,12 @@
 package org.optaplanner.examples.nurserostering.persistence;
 
 import java.io.IOException;
+import java.time.format.DateTimeFormatter;
 
 import org.jdom.Element;
 import org.optaplanner.examples.common.persistence.AbstractXmlSolutionExporter;
+import org.optaplanner.examples.common.persistence.SolutionConverter;
+import org.optaplanner.examples.nurserostering.app.NurseRosteringApp;
 import org.optaplanner.examples.nurserostering.domain.NurseRoster;
 import org.optaplanner.examples.nurserostering.domain.Shift;
 import org.optaplanner.examples.nurserostering.domain.ShiftAssignment;
@@ -27,11 +30,9 @@ import org.optaplanner.examples.nurserostering.domain.ShiftAssignment;
 public class NurseRosteringExporter extends AbstractXmlSolutionExporter<NurseRoster> {
 
     public static void main(String[] args) {
-        new NurseRosteringExporter().convertAll();
-    }
-
-    public NurseRosteringExporter() {
-        super(new NurseRosteringDao());
+        SolutionConverter<NurseRoster> converter = SolutionConverter.createExportConverter(
+                NurseRosteringApp.DATA_DIR_NAME, NurseRoster.class, new NurseRosteringExporter());
+        converter.convertAll();
     }
 
     @Override
@@ -72,7 +73,7 @@ public class NurseRosteringExporter extends AbstractXmlSolutionExporter<NurseRos
                     solutionElement.addContent(assignmentElement);
 
                     Element dateElement = new Element("Date");
-                    dateElement.setText(shift.getShiftDate().getDateString());
+                    dateElement.setText(shift.getShiftDate().getDate().format(DateTimeFormatter.ISO_DATE));
                     assignmentElement.addContent(dateElement);
 
                     Element employeeElement = new Element("Employee");

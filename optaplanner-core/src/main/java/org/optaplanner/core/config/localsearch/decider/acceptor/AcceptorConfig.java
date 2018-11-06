@@ -30,7 +30,6 @@ import org.optaplanner.core.impl.localsearch.decider.acceptor.Acceptor;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.CompositeAcceptor;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.hillclimbing.HillClimbingAcceptor;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.lateacceptance.LateAcceptanceAcceptor;
-import org.optaplanner.core.impl.localsearch.decider.acceptor.latesimulatedannealing.LateSimulatedAnnealingAcceptor;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.simulatedannealing.SimulatedAnnealingAcceptor;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.stepcountinghillclimbing.StepCountingHillClimbingAcceptor;
 import org.optaplanner.core.impl.localsearch.decider.acceptor.tabu.EntityTabuAcceptor;
@@ -46,6 +45,7 @@ import static org.apache.commons.lang3.ObjectUtils.*;
 @XStreamAlias("acceptor")
 public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
 
+    @Deprecated // TODO remove in 8.0
     @XStreamImplicit(itemFieldName = "acceptorClass")
     private List<Class<? extends Acceptor>> acceptorClassList = null;
 
@@ -74,13 +74,12 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
     protected Integer stepCountingHillClimbingSize = null;
     protected StepCountingHillClimbingType stepCountingHillClimbingType = null;
 
-    @Deprecated // Experimental feature (no backwards compatibility guarantee)
-    protected Integer lateSimulatedAnnealingSize = null;
-
+    @Deprecated
     public List<Class<? extends Acceptor>> getAcceptorClassList() {
         return acceptorClassList;
     }
 
+    @Deprecated
     public void setAcceptorClassList(List<Class<? extends Acceptor>> acceptorClassList) {
         this.acceptorClassList = acceptorClassList;
     }
@@ -237,14 +236,108 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
         this.stepCountingHillClimbingType = stepCountingHillClimbingType;
     }
 
-    @Deprecated // Experimental feature (no backwards compatibility guarantee)
-    public Integer getLateSimulatedAnnealingSize() {
-        return lateSimulatedAnnealingSize;
+    // ************************************************************************
+    // With methods
+    // ************************************************************************
+
+    public AcceptorConfig withAcceptorClassList(List<Class<? extends Acceptor>> acceptorClassList) {
+        this.acceptorClassList = acceptorClassList;
+        return this;
     }
 
-    @Deprecated // Experimental feature (no backwards compatibility guarantee)
-    public void setLateSimulatedAnnealingSize(Integer lateSimulatedAnnealingSize) {
-        this.lateSimulatedAnnealingSize = lateSimulatedAnnealingSize;
+    public AcceptorConfig withAcceptorTypeList(List<AcceptorType> acceptorTypeList) {
+        this.acceptorTypeList = acceptorTypeList;
+        return this;
+    }
+
+    public AcceptorConfig withEntityTabuSize(Integer entityTabuSize) {
+        this.entityTabuSize = entityTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withEntityTabuRatio(Double entityTabuRatio) {
+        this.entityTabuRatio = entityTabuRatio;
+        return this;
+    }
+
+    public AcceptorConfig withFadingEntityTabuSize(Integer fadingEntityTabuSize) {
+        this.fadingEntityTabuSize = fadingEntityTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withFadingEntityTabuRatio(Double fadingEntityTabuRatio) {
+        this.fadingEntityTabuRatio = fadingEntityTabuRatio;
+        return this;
+    }
+
+    public AcceptorConfig withValueTabuSize(Integer valueTabuSize) {
+        this.valueTabuSize = valueTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withValueTabuRatio(Double valueTabuRatio) {
+        this.valueTabuRatio = valueTabuRatio;
+        return this;
+    }
+
+    public AcceptorConfig withFadingValueTabuSize(Integer fadingValueTabuSize) {
+        this.fadingValueTabuSize = fadingValueTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withFadingValueTabuRatio(Double fadingValueTabuRatio) {
+        this.fadingValueTabuRatio = fadingValueTabuRatio;
+        return this;
+    }
+
+    public AcceptorConfig withMoveTabuSize(Integer moveTabuSize) {
+        this.moveTabuSize = moveTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withFadingMoveTabuSize(Integer fadingMoveTabuSize) {
+        this.fadingMoveTabuSize = fadingMoveTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withUndoMoveTabuSize(Integer undoMoveTabuSize) {
+        this.undoMoveTabuSize = undoMoveTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withFadingUndoMoveTabuSize(Integer fadingUndoMoveTabuSize) {
+        this.fadingUndoMoveTabuSize = fadingUndoMoveTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withSolutionTabuSize(Integer solutionTabuSize) {
+        this.solutionTabuSize = solutionTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withFadingSolutionTabuSize(Integer fadingSolutionTabuSize) {
+        this.fadingSolutionTabuSize = fadingSolutionTabuSize;
+        return this;
+    }
+
+    public AcceptorConfig withSimulatedAnnealingStartingTemperature(String simulatedAnnealingStartingTemperature) {
+        this.simulatedAnnealingStartingTemperature = simulatedAnnealingStartingTemperature;
+        return this;
+    }
+
+    public AcceptorConfig withLateAcceptanceSize(Integer lateAcceptanceSize) {
+        this.lateAcceptanceSize = lateAcceptanceSize;
+        return this;
+    }
+
+    public AcceptorConfig withStepCountingHillClimbingSize(Integer stepCountingHillClimbingSize) {
+        this.stepCountingHillClimbingSize = stepCountingHillClimbingSize;
+        return this;
+    }
+
+    public AcceptorConfig withStepCountingHillClimbingType(StepCountingHillClimbingType stepCountingHillClimbingType) {
+        this.stepCountingHillClimbingType = stepCountingHillClimbingType;
+        return this;
     }
 
     // ************************************************************************
@@ -267,7 +360,7 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
         if ((acceptorTypeList != null && acceptorTypeList.contains(AcceptorType.ENTITY_TABU))
                 || entityTabuSize != null || entityTabuRatio != null
                 || fadingEntityTabuSize != null || fadingEntityTabuRatio != null) {
-            EntityTabuAcceptor acceptor = new EntityTabuAcceptor();
+            EntityTabuAcceptor acceptor = new EntityTabuAcceptor(configPolicy.getLogIndentation());
             if (entityTabuSize != null) {
                 if (entityTabuRatio != null) {
                     throw new IllegalArgumentException("The acceptor cannot have both entityTabuSize ("
@@ -297,7 +390,7 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
         if ((acceptorTypeList != null && acceptorTypeList.contains(AcceptorType.VALUE_TABU))
                 || valueTabuSize != null || valueTabuRatio != null
                 || fadingValueTabuSize != null  || fadingValueTabuRatio != null) {
-            ValueTabuAcceptor acceptor = new ValueTabuAcceptor();
+            ValueTabuAcceptor acceptor = new ValueTabuAcceptor(configPolicy.getLogIndentation());
             if (valueTabuSize != null) {
                 if (valueTabuRatio != null) {
                     throw new IllegalArgumentException("The acceptor cannot have both valueTabuSize ("
@@ -331,7 +424,7 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
         }
         if ((acceptorTypeList != null && acceptorTypeList.contains(AcceptorType.MOVE_TABU))
                 || moveTabuSize != null || fadingMoveTabuSize != null) {
-            MoveTabuAcceptor acceptor = new MoveTabuAcceptor();
+            MoveTabuAcceptor acceptor = new MoveTabuAcceptor(configPolicy.getLogIndentation());
             acceptor.setUseUndoMoveAsTabuMove(false);
             if (moveTabuSize != null) {
                 acceptor.setTabuSizeStrategy(new FixedTabuSizeStrategy(moveTabuSize));
@@ -346,7 +439,7 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
         }
         if ((acceptorTypeList != null && acceptorTypeList.contains(AcceptorType.UNDO_MOVE_TABU))
                 || undoMoveTabuSize != null || fadingUndoMoveTabuSize != null) {
-            MoveTabuAcceptor acceptor = new MoveTabuAcceptor();
+            MoveTabuAcceptor acceptor = new MoveTabuAcceptor(configPolicy.getLogIndentation());
             acceptor.setUseUndoMoveAsTabuMove(true);
             if (undoMoveTabuSize != null) {
                 acceptor.setTabuSizeStrategy(new FixedTabuSizeStrategy(undoMoveTabuSize));
@@ -361,7 +454,7 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
         }
         if ((acceptorTypeList != null && acceptorTypeList.contains(AcceptorType.SOLUTION_TABU))
                 || solutionTabuSize != null || fadingSolutionTabuSize != null) {
-            SolutionTabuAcceptor acceptor = new SolutionTabuAcceptor();
+            SolutionTabuAcceptor acceptor = new SolutionTabuAcceptor(configPolicy.getLogIndentation());
             if (solutionTabuSize != null) {
                 acceptor.setTabuSizeStrategy(new FixedTabuSizeStrategy(solutionTabuSize));
             }
@@ -399,12 +492,6 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
                     = defaultIfNull(stepCountingHillClimbingType, StepCountingHillClimbingType.STEP);
             StepCountingHillClimbingAcceptor acceptor = new StepCountingHillClimbingAcceptor(
                     stepCountingHillClimbingSize_, stepCountingHillClimbingType_);
-            acceptorList.add(acceptor);
-        }
-        if ((acceptorTypeList != null && acceptorTypeList.contains(AcceptorType.LATE_SIMULATED_ANNEALING))
-                || lateSimulatedAnnealingSize != null) {
-            LateSimulatedAnnealingAcceptor acceptor = new LateSimulatedAnnealingAcceptor();
-            acceptor.setLateSimulatedAnnealingSize(defaultIfNull(lateSimulatedAnnealingSize, 400));
             acceptorList.add(acceptor);
         }
         if (acceptorList.size() == 1) {
@@ -466,8 +553,6 @@ public class AcceptorConfig extends AbstractConfig<AcceptorConfig> {
                 inheritedConfig.getStepCountingHillClimbingSize());
         stepCountingHillClimbingType = ConfigUtils.inheritOverwritableProperty(stepCountingHillClimbingType,
                 inheritedConfig.getStepCountingHillClimbingType());
-        lateSimulatedAnnealingSize = ConfigUtils.inheritOverwritableProperty(lateSimulatedAnnealingSize,
-                inheritedConfig.getLateSimulatedAnnealingSize());
     }
 
 }

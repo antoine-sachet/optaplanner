@@ -95,17 +95,11 @@ public class SwingUtils {
                 }
             }
             lookAndFeelException = null;
-        } catch (UnsupportedLookAndFeelException e) {
-            lookAndFeelException = e;
-        } catch (ClassNotFoundException e) {
-            lookAndFeelException = e;
-        } catch (InstantiationException e) {
-            lookAndFeelException = e;
-        } catch (IllegalAccessException e) {
+        } catch (UnsupportedLookAndFeelException | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
             lookAndFeelException = e;
         }
         if (lookAndFeelException != null) {
-            logger.warn("Could not switch to lookAndFeel (" + lookAndFeelName + "). Layout might be incorrect.",
+            logger.warn("Could not switch to lookAndFeel ({}). Layout might be incorrect.", lookAndFeelName,
                     lookAndFeelException);
         }
     }

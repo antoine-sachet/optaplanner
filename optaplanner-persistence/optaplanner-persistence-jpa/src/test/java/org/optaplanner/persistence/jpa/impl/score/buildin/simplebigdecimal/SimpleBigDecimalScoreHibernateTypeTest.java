@@ -31,8 +31,8 @@ public class SimpleBigDecimalScoreHibernateTypeTest extends AbstractScoreHiberna
     @Test
     public void persistAndMerge() {
         persistAndMerge(new TestJpaEntity(null),
-                SimpleBigDecimalScore.valueOfInitialized(new BigDecimal("-10.01000")),
-                SimpleBigDecimalScore.valueOf(-7, new BigDecimal("-10.01000")));
+                SimpleBigDecimalScore.of(new BigDecimal("-10.01000")),
+                SimpleBigDecimalScore.ofUninitialized(-7, new BigDecimal("-10.01000")));
     }
 
     @Entity

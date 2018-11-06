@@ -17,10 +17,14 @@
 package org.optaplanner.core.impl.score.director.incremental;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.score.Score;
+import org.optaplanner.core.api.score.constraint.ConstraintMatch;
 import org.optaplanner.core.api.score.constraint.ConstraintMatchTotal;
+import org.optaplanner.core.api.score.constraint.Indictment;
 import org.optaplanner.core.impl.domain.entity.descriptor.EntityDescriptor;
 import org.optaplanner.core.impl.domain.variable.descriptor.VariableDescriptor;
 import org.optaplanner.core.impl.score.director.AbstractScoreDirector;
@@ -38,10 +42,10 @@ public class IncrementalScoreDirector<Solution_>
 
     private final IncrementalScoreCalculator<Solution_> incrementalScoreCalculator;
 
-    public IncrementalScoreDirector(IncrementalScoreDirectorFactory scoreDirectorFactory,
-                                    boolean constraintMatchEnabledPreference,
-                                    IncrementalScoreCalculator<Solution_> incrementalScoreCalculator) {
-        super(scoreDirectorFactory, constraintMatchEnabledPreference);
+    public IncrementalScoreDirector(IncrementalScoreDirectorFactory<Solution_> scoreDirectorFactory,
+            boolean lookUpEnabled, boolean constraintMatchEnabledPreference,
+            IncrementalScoreCalculator<Solution_> incrementalScoreCalculator) {
+        super(scoreDirectorFactory, lookUpEnabled, constraintMatchEnabledPreference);
         this.incrementalScoreCalculator = incrementalScoreCalculator;
     }
 
@@ -57,7 +61,7 @@ public class IncrementalScoreDirector<Solution_>
     public void setWorkingSolution(Solution_ workingSolution) {
         super.setWorkingSolution(workingSolution);
         if (incrementalScoreCalculator instanceof ConstraintMatchAwareIncrementalScoreCalculator) {
-            ((ConstraintMatchAwareIncrementalScoreCalculator) incrementalScoreCalculator)
+            ((ConstraintMatchAwareIncrementalScoreCalculator<Solution_>) incrementalScoreCalculator)
                     .resetWorkingSolution(workingSolution, constraintMatchEnabledPreference);
         } else {
             incrementalScoreCalculator.resetWorkingSolution(workingSolution);
@@ -67,7 +71,14 @@ public class IncrementalScoreDirector<Solution_>
     @Override
     public Score calculateScore() {
         variableListenerSupport.assertNotificationQueuesAreEmpty();
-        Score score = incrementalScoreCalculator.calculateScore(workingInitScore);
+        Score score = incrementalScoreCalculator.calculateScore();
+        if (score == null) {
+            throw new IllegalStateException("The incrementalScoreCalculator (" + incrementalScoreCalculator.getClass()
+                    + ") must return a non-null score (" + score + ") in the method calculateScore().");
+        }
+        if (workingInitScore != 0) {
+            score = score.withInitScore(workingInitScore);
+        }
         setCalculatedScore(score);
         return score;
     }
@@ -82,10 +93,39 @@ public class IncrementalScoreDirector<Solution_>
     public Collection<ConstraintMatchTotal> getConstraintMatchTotals() {
         if (!isConstraintMatchEnabled()) {
             throw new IllegalStateException("When constraintMatchEnabled (" + isConstraintMatchEnabled()
-                    + ") is disabled, this method should not be called.");
+                    + ") is disabled in the constructor, this method should not be called.");
         }
+        // Notice that we don't trigger the variable listeners
         return ((ConstraintMatchAwareIncrementalScoreCalculator<Solution_>) incrementalScoreCalculator)
                 .getConstraintMatchTotals();
+    }
+
+    @Override
+    public Map<Object, Indictment> getIndictmentMap() {
+        if (!isConstraintMatchEnabled()) {
+            throw new IllegalStateException("When constraintMatchEnabled (" + isConstraintMatchEnabled()
+                    + ") is disabled in the constructor, this method should not be called.");
+        }
+        Map<Object, Indictment> incrementalIndictmentMap
+                = ((ConstraintMatchAwareIncrementalScoreCalculator<Solution_>) incrementalScoreCalculator)
+                .getIndictmentMap();
+        if (incrementalIndictmentMap != null) {
+            return incrementalIndictmentMap;
+        }
+        Map<Object, Indictment> indictmentMap = new LinkedHashMap<>(); // TODO use entitySize
+        Score zeroScore = getScoreDefinition().getZeroScore();
+        for (ConstraintMatchTotal constraintMatchTotal : getConstraintMatchTotals()) {
+            for (ConstraintMatch constraintMatch : constraintMatchTotal.getConstraintMatchSet()) {
+                constraintMatch.getJustificationList().stream()
+                        .distinct() // One match might have the same justification twice
+                        .forEach(justification -> {
+                            Indictment indictment = indictmentMap.computeIfAbsent(justification,
+                                    k -> new Indictment(justification, zeroScore));
+                            indictment.addConstraintMatch(constraintMatch);
+                        });
+            }
+        }
+        return indictmentMap;
     }
 
     // ************************************************************************
@@ -144,14 +184,14 @@ public class IncrementalScoreDirector<Solution_>
     }
 
     @Override
-    public void beforeProblemFactChanged(Object problemFact) {
-        super.beforeProblemFactChanged(problemFact);
+    public void beforeProblemPropertyChanged(Object problemFactOrEntity) {
+        super.beforeProblemPropertyChanged(problemFactOrEntity);
     }
 
     @Override
-    public void afterProblemFactChanged(Object problemFact) {
+    public void afterProblemPropertyChanged(Object problemFactOrEntity) {
         incrementalScoreCalculator.resetWorkingSolution(workingSolution); // TODO do not nuke it
-        super.afterProblemFactChanged(problemFact);
+        super.afterProblemPropertyChanged(problemFactOrEntity);
     }
 
     @Override

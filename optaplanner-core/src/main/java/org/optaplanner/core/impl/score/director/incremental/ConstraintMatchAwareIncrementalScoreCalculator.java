@@ -17,9 +17,11 @@
 package org.optaplanner.core.impl.score.director.incremental;
 
 import java.util.Collection;
+import java.util.Map;
 
 import org.optaplanner.core.api.domain.solution.PlanningSolution;
 import org.optaplanner.core.api.score.constraint.ConstraintMatchTotal;
+import org.optaplanner.core.api.score.constraint.Indictment;
 import org.optaplanner.core.impl.score.director.ScoreDirector;
 
 /**
@@ -33,21 +35,27 @@ public interface ConstraintMatchAwareIncrementalScoreCalculator<Solution_>
         extends IncrementalScoreCalculator<Solution_> {
 
     /**
-     * Allows for increased performance by tracking only if constraintMatchEnabled is true.
+     * Allows for increased performance because it only tracks if constraintMatchEnabled is true.
      * <p>
-     * Every implementation should call {@link #resetWorkingSolution(Solution_)}
+     * Every implementation should call {@link #resetWorkingSolution}
      * and only handle the constraintMatchEnabled parameter specifically (or ignore it).
-     * @param workingSolution never null, to pass to {@link #resetWorkingSolution(Solution_)}.
-     * @param constraintMatchEnabled true if {@link #getConstraintMatchTotals()} might be called.
+     * @param workingSolution never null, to pass to {@link #resetWorkingSolution}.
+     * @param constraintMatchEnabled true if {@link #getConstraintMatchTotals()} or {@link #getIndictmentMap()} might be called.
      */
     void resetWorkingSolution(Solution_ workingSolution, boolean constraintMatchEnabled);
 
     /**
      * @return never null
-     * @throws IllegalStateException if {@link #resetWorkingSolution(Solution_, boolean)}'s
-     * constraintMatchEnabled parameter was false
+     * @throws IllegalStateException if {@link #resetWorkingSolution}'s constraintMatchEnabled parameter was false
      * @see ScoreDirector#getConstraintMatchTotals()
      */
     Collection<ConstraintMatchTotal> getConstraintMatchTotals();
+
+    /**
+     * @return null if it should to be calculated non-incrementally from {@link #getConstraintMatchTotals()}
+     * @throws IllegalStateException if {@link #resetWorkingSolution}'s constraintMatchEnabled parameter was false
+     * @see ScoreDirector#getIndictmentMap()
+     */
+    Map<Object, Indictment> getIndictmentMap();
 
 }

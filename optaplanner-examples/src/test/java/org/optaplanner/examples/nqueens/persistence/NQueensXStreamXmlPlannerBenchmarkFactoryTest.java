@@ -60,7 +60,7 @@ public class NQueensXStreamXmlPlannerBenchmarkFactoryTest {
     private void compareOutputToOriginal(XStreamXmlPlannerBenchmarkFactory plannerBenchmarkFactory, String plannerBenchmarkConfigResource) throws IOException {
         String originalXml = IOUtils.toString(getClass().getResourceAsStream(plannerBenchmarkConfigResource), "UTF-8");
         String savedXml = plannerBenchmarkFactory.getXStream().toXML(plannerBenchmarkFactory.getPlannerBenchmarkConfig());
-        assertEquals(originalXml, savedXml);
+        assertEquals(originalXml.trim(), savedXml);
     }
 
     private void readWriteTest(String plannerBenchmarkConfigResource) throws IOException {
@@ -73,4 +73,5 @@ public class NQueensXStreamXmlPlannerBenchmarkFactoryTest {
         plannerBenchmarkFactory.getPlannerBenchmarkConfig().buildPlannerBenchmark();
         compareOutputToOriginal(plannerBenchmarkFactory, plannerBenchmarkConfigResource);
     }
+
 }

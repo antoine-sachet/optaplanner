@@ -27,6 +27,10 @@ public class MoveTabuAcceptor extends AbstractTabuAcceptor {
 
     protected boolean useUndoMoveAsTabuMove = true;
 
+    public MoveTabuAcceptor(String logIndentation) {
+        super(logIndentation);
+    }
+
     public void setUseUndoMoveAsTabuMove(boolean useUndoMoveAsTabuMove) {
         this.useUndoMoveAsTabuMove = useUndoMoveAsTabuMove;
     }
@@ -42,7 +46,7 @@ public class MoveTabuAcceptor extends AbstractTabuAcceptor {
 
     @Override
     protected Collection<? extends Object> findNewTabu(LocalSearchStepScope stepScope) {
-        Move tabuMove;
+        Move<?> tabuMove;
         if (useUndoMoveAsTabuMove) {
             tabuMove = stepScope.getUndoStep();
         } else {

@@ -2,7 +2,6 @@
 <plannerBenchmark>
   <benchmarkDirectory>local/data/nurserostering/long</benchmarkDirectory>
   <parallelBenchmarkCount>AUTO</parallelBenchmarkCount>
-  <warmUpSecondsSpentLimit>30</warmUpSecondsSpentLimit>
 
   <inheritedSolverBenchmark>
     <problemBenchmarks>
@@ -20,7 +19,7 @@
       <!--<inputSolutionFile>data/nurserostering/unsolved/long_late03.xml</inputSolutionFile>-->
       <!--<inputSolutionFile>data/nurserostering/unsolved/long_late04.xml</inputSolutionFile>-->
       <!--<inputSolutionFile>data/nurserostering/unsolved/long_late05.xml</inputSolutionFile>-->
-      <problemStatisticType>BEST_SCORE</problemStatisticType>
+      <!--<problemStatisticType>BEST_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>STEP_SCORE</problemStatisticType>-->
       <!--<problemStatisticType>SCORE_CALCULATION_SPEED</problemStatisticType>-->
       <!--<problemStatisticType>BEST_SOLUTION_MUTATION</problemStatisticType>-->
@@ -36,21 +35,20 @@
       <solutionClass>org.optaplanner.examples.nurserostering.domain.NurseRoster</solutionClass>
       <entityClass>org.optaplanner.examples.nurserostering.domain.ShiftAssignment</entityClass>
       <scoreDirectorFactory>
-        <scoreDefinitionType>HARD_SOFT</scoreDefinitionType>
         <scoreDrl>org/optaplanner/examples/nurserostering/solver/nurseRosteringScoreRules.drl</scoreDrl>
       </scoreDirectorFactory>
       <termination>
         <minutesSpentLimit>5</minutesSpentLimit>
       </termination>
-      <constructionHeuristic>
-        <constructionHeuristicType>WEAKEST_FIT</constructionHeuristicType>
-      </constructionHeuristic>
     </solver>
   </inheritedSolverBenchmark>
 
   <solverBenchmark>
     <name>absolute300SeqLength2and3PillarPart</name>
     <solver>
+      <constructionHeuristic>
+        <constructionHeuristicType>WEAKEST_FIT</constructionHeuristicType>
+      </constructionHeuristic>
       <localSearch>
         <unionMoveSelector>
           <moveListFactory>

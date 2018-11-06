@@ -98,11 +98,6 @@ public class InvestmentPanel extends SolutionPanel<InvestmentSolution> {
     }
 
     @Override
-    public boolean isRefreshScreenDuringSolving() {
-        return true;
-    }
-
-    @Override
     public void resetPanel(InvestmentSolution solution) {
         ignoreChangeEvents = true;
         assetClassPanel.reset();
@@ -284,9 +279,9 @@ public class InvestmentPanel extends SolutionPanel<InvestmentSolution> {
         }
     }
 
-    private JPanel createTableHeader(JLabel label, String toolTipText) {
-        if (toolTipText != null) {
-            label.setToolTipText(toolTipText);
+    private JPanel createTableHeader(JLabel label, String toolTip) {
+        if (toolTip != null) {
+            label.setToolTipText(toolTip);
         }
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.add(label, BorderLayout.NORTH);
@@ -300,9 +295,9 @@ public class InvestmentPanel extends SolutionPanel<InvestmentSolution> {
         doProblemFactChange(scoreDirector -> {
             InvestmentSolution solution = scoreDirector.getWorkingSolution();
             InvestmentParametrization parametrization = solution.getParametrization();
-            scoreDirector.beforeProblemFactChanged(parametrization);
+            scoreDirector.beforeProblemPropertyChanged(parametrization);
             parametrization.setStandardDeviationMillisMaximum(standardDeviationMillisMaximum);
-            scoreDirector.afterProblemFactChanged(parametrization);
+            scoreDirector.afterProblemPropertyChanged(parametrization);
         }, true);
     }
 
@@ -311,9 +306,9 @@ public class InvestmentPanel extends SolutionPanel<InvestmentSolution> {
             InvestmentSolution solution = scoreDirector.getWorkingSolution();
             for (Region workingRegion : solution.getRegionList()) {
                 if (region.getId().equals(workingRegion.getId())) {
-                    scoreDirector.beforeProblemFactChanged(workingRegion);
+                    scoreDirector.beforeProblemPropertyChanged(workingRegion);
                     workingRegion.setQuantityMillisMaximum(quantityMillisMaximum);
-                    scoreDirector.afterProblemFactChanged(workingRegion);
+                    scoreDirector.afterProblemPropertyChanged(workingRegion);
                     break;
                 }
             }
@@ -325,9 +320,9 @@ public class InvestmentPanel extends SolutionPanel<InvestmentSolution> {
             InvestmentSolution solution = scoreDirector.getWorkingSolution();
             for (Sector workingSector : solution.getSectorList()) {
                 if (sector.getId().equals(workingSector.getId())) {
-                    scoreDirector.beforeProblemFactChanged(workingSector);
+                    scoreDirector.beforeProblemPropertyChanged(workingSector);
                     workingSector.setQuantityMillisMaximum(quantityMillisMaximum);
-                    scoreDirector.afterProblemFactChanged(workingSector);
+                    scoreDirector.afterProblemPropertyChanged(workingSector);
                     break;
                 }
             }
